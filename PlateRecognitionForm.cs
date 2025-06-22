@@ -7,16 +7,17 @@ using Newtonsoft.Json.Linq;
 using WinForms_RTSP_Player.Utilities;
 using WinForms_RTSP_Player.Data;
 using System.Configuration;
+using System.Drawing;
 
 namespace WinForms_RTSP_Player
 {
-    public partial class MainForm : Form
+    public partial class PlateRecognitionForm : Form
     {
         private LibVLC _libVLC;
         private MediaPlayer _mediaPlayer;
-        private Timer _frameCaptureTimer;
+        private System.Windows.Forms.Timer _frameCaptureTimer;
 
-        private Timer _streamHealthTimer;          // Stream sağlığı için timer
+        private System.Windows.Forms.Timer _streamHealthTimer;          // Stream sağlığı için timer
         private DateTime _lastVideoUpdateTime;     // Son video frame zaman damgası
 
         //private string _rtspUrl = "rtsp://192.168.0.101/user=admin_password=tlJwpbo6_channel=1_stream=0.sdp?real_stream";//Eski kamera
@@ -24,7 +25,7 @@ namespace WinForms_RTSP_Player
 
         private DatabaseManager _databaseManager; // Veri tabanı yöneticisi
 
-        public MainForm()
+        public PlateRecognitionForm()
         {
             InitializeComponent();
             Core.Initialize(@"libvlc\win-x64");
@@ -67,11 +68,11 @@ namespace WinForms_RTSP_Player
                 _lastVideoUpdateTime = DateTime.Now;
             };
 
-            _frameCaptureTimer = new Timer { Interval = 2000 };
+            _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 2000 };
             _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
 
             // Stream sağlık kontrol timer
-            _streamHealthTimer = new Timer { Interval = 900000 }; // 15 dakikada bir kontrol
+            _streamHealthTimer = new System.Windows.Forms.Timer { Interval = 900000 }; // 15 dakikada bir kontrol
             _streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
 
             // Veri tabanı yöneticisini başlat
@@ -111,7 +112,14 @@ namespace WinForms_RTSP_Player
                         
                         // Sonucu ekranda göster
                         string status = isAuthorized ? "✅ İZİNLİ" : "❌ İZİNSİZ";
-                        lblPlate.Text = $"Tespit Edilen Plaka: {correctedPlate} - {status}";
+                        Color statusColor = isAuthorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
+                        
+                        lblResult.Text = $"Tespit Edilen Plaka: {correctedPlate}";
+                        lblResult.ForeColor = statusColor;
+                        
+                        // Durum etiketini güncelle
+                        lblStatus.Text = $"Sistem Durumu: {status}";
+                        lblStatus.ForeColor = statusColor;
                         
                         // Erişim logunu kaydet
                         _databaseManager.LogAccess(correctedPlate, "IN", isAuthorized);
@@ -137,7 +145,10 @@ namespace WinForms_RTSP_Player
                     }
                     else
                     {
-                        lblPlate.Text = "Tespit Edilen Plaka: ---";
+                        lblResult.Text = "Tespit Edilen Plaka: ---";
+                        lblResult.ForeColor = Color.Silver;
+                        lblStatus.Text = "Sistem Durumu: Bekleniyor...";
+                        lblStatus.ForeColor = Color.Silver;
                         Console.WriteLine("🎯 Plaka okunamadı veya geçersiz.");
                     }
                     
@@ -191,5 +202,19 @@ namespace WinForms_RTSP_Player
             }
         }
 
+        private void UpdateStatus(string status, string plate = null)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => UpdateStatus(status, plate)));
+                return;
+            }
+
+            lblStatus.Text = $"Sistem Durumu: {status}";
+            if (!string.IsNullOrEmpty(plate))
+            {
+                lblResult.Text = $"Tespit Edilen Plaka: {plate}";
+            }
+        }
     }
 }

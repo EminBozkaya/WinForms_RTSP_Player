@@ -10,7 +10,7 @@ namespace WinForms_RTSP_Player.Business
     {
         private readonly MediaPlayer _mediaPlayer;
         private readonly Func<Media> _mediaFactory; // RTSP URL'yi veren fonksiyon
-        private readonly Timer _reconnectTimer;
+        private readonly System.Windows.Forms.Timer _reconnectTimer;
 
         public ReconnectManager(MediaPlayer mediaPlayer, Func<Media> mediaFactory)
         {
@@ -20,7 +20,7 @@ namespace WinForms_RTSP_Player.Business
             _mediaPlayer.EncounteredError += MediaPlayer_ConnectionIssue;
             _mediaPlayer.Stopped += MediaPlayer_ConnectionIssue;
 
-            _reconnectTimer = new Timer();
+            _reconnectTimer = new System.Windows.Forms.Timer();
             _reconnectTimer.Interval = 3000; // 3 saniyede bir yeniden dene
             _reconnectTimer.Tick += (s, e) => AttemptReconnect();
         }

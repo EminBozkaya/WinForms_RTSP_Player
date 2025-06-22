@@ -1,6 +1,6 @@
+using Microsoft.Data.Sqlite;
 using System;
 using System.Data;
-using System.Data.SQLite;
 using System.IO;
 
 namespace WinForms_RTSP_Player.Data
@@ -13,7 +13,7 @@ namespace WinForms_RTSP_Player.Data
         public DatabaseManager()
         {
             _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PlateDatabase.db");
-            _connectionString = $"Data Source={_dbPath};Version=3;";
+            _connectionString = $"Data Source={_dbPath}";
             InitializeDatabase();
         }
 
@@ -27,7 +27,7 @@ namespace WinForms_RTSP_Player.Data
 
         private void CreateDatabase()
         {
-            using (var connection = new SQLiteConnection(_connectionString))
+            using (var connection = new SqliteConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -65,17 +65,17 @@ namespace WinForms_RTSP_Player.Data
                         Details TEXT
                     )";
 
-                using (var command = new SQLiteCommand(createPlatesTable, connection))
+                using (var command = new SqliteCommand(createPlatesTable, connection))
                 {
                     command.ExecuteNonQuery();
                 }
 
-                using (var command = new SQLiteCommand(createAccessLogTable, connection))
+                using (var command = new SqliteCommand(createAccessLogTable, connection))
                 {
                     command.ExecuteNonQuery();
                 }
 
-                using (var command = new SQLiteCommand(createSystemLogTable, connection))
+                using (var command = new SqliteCommand(createSystemLogTable, connection))
                 {
                     command.ExecuteNonQuery();
                 }
@@ -105,14 +105,14 @@ namespace WinForms_RTSP_Player.Data
         {
             try
             {
-                using (var connection = new SQLiteConnection(_connectionString))
+                using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
                     string query = @"
                         INSERT INTO Plates (PlateNumber, OwnerName, VehicleType) 
                         VALUES (@PlateNumber, @OwnerName, @VehicleType)";
 
-                    using (var command = new SQLiteCommand(query, connection))
+                    using (var command = new SqliteCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@PlateNumber", plateNumber);
                         command.Parameters.AddWithValue("@OwnerName", ownerName);
@@ -133,12 +133,12 @@ namespace WinForms_RTSP_Player.Data
         {
             try
             {
-                using (var connection = new SQLiteConnection(_connectionString))
+                using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
                     string query = "SELECT COUNT(*) FROM Plates WHERE PlateNumber = @PlateNumber AND IsActive = 1";
 
-                    using (var command = new SQLiteCommand(query, connection))
+                    using (var command = new SqliteCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@PlateNumber", plateNumber);
                         int count = Convert.ToInt32(command.ExecuteScalar());
@@ -157,14 +157,14 @@ namespace WinForms_RTSP_Player.Data
         {
             try
             {
-                using (var connection = new SQLiteConnection(_connectionString))
+                using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
                     string query = @"
                         INSERT INTO AccessLog (PlateNumber, AccessType, IsAuthorized, Confidence) 
                         VALUES (@PlateNumber, @AccessType, @IsAuthorized, @Confidence)";
 
-                    using (var command = new SQLiteCommand(query, connection))
+                    using (var command = new SqliteCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@PlateNumber", plateNumber);
                         command.Parameters.AddWithValue("@AccessType", accessType);
@@ -184,14 +184,14 @@ namespace WinForms_RTSP_Player.Data
         {
             try
             {
-                using (var connection = new SQLiteConnection(_connectionString))
+                using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
                     string query = @"
                         INSERT INTO SystemLog (LogLevel, Message, Details) 
                         VALUES (@LogLevel, @Message, @Details)";
 
-                    using (var command = new SQLiteCommand(query, connection))
+                    using (var command = new SqliteCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@LogLevel", logLevel);
                         command.Parameters.AddWithValue("@Message", message);
@@ -210,15 +210,16 @@ namespace WinForms_RTSP_Player.Data
         {
             try
             {
-                using (var connection = new SQLiteConnection(_connectionString))
+                using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
                     string query = "SELECT * FROM Plates WHERE IsActive = 1 ORDER BY CreatedDate DESC";
 
-                    using (var adapter = new SQLiteDataAdapter(query, connection))
+                    using (var command = new SqliteCommand(query, connection))
+                    using (var reader = command.ExecuteReader())
                     {
                         var dataTable = new DataTable();
-                        adapter.Fill(dataTable);
+                        dataTable.Load(reader);
                         return dataTable;
                     }
                 }
@@ -234,15 +235,16 @@ namespace WinForms_RTSP_Player.Data
         {
             try
             {
-                using (var connection = new SQLiteConnection(_connectionString))
+                using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
                     string query = $"SELECT * FROM AccessLog ORDER BY AccessTime DESC LIMIT {limit}";
 
-                    using (var adapter = new SQLiteDataAdapter(query, connection))
+                    using (var command = new SqliteCommand(query, connection))
+                    using (var reader = command.ExecuteReader())
                     {
                         var dataTable = new DataTable();
-                        adapter.Fill(dataTable);
+                        dataTable.Load(reader);
                         return dataTable;
                     }
                 }

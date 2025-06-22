@@ -1,10 +1,11 @@
 using System;
-using System.Diagnostics;
+//using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
 using LibVLCSharp.Shared;
 using Newtonsoft.Json.Linq;
 using WinForms_RTSP_Player.Utilities;
+using WinForms_RTSP_Player.Data;
 using System.Configuration;
 
 namespace WinForms_RTSP_Player
@@ -15,11 +16,13 @@ namespace WinForms_RTSP_Player
         private MediaPlayer _mediaPlayer;
         private Timer _frameCaptureTimer;
 
-        //private Timer _streamHealthTimer;          // Stream sağlığı için timer
-        //private DateTime _lastVideoUpdateTime;     // Son video frame zaman damgası
+        private Timer _streamHealthTimer;          // Stream sağlığı için timer
+        private DateTime _lastVideoUpdateTime;     // Son video frame zaman damgası
 
         //private string _rtspUrl = "rtsp://192.168.0.101/user=admin_password=tlJwpbo6_channel=1_stream=0.sdp?real_stream";//Eski kamera
         private string _rtspUrl = string.Empty; // RTSP URL'si App.config'den alınacak
+
+        private DatabaseManager _databaseManager; // Veri tabanı yöneticisi
 
         public MainForm()
         {
@@ -58,28 +61,32 @@ namespace WinForms_RTSP_Player
             _mediaPlayer.Mute = true;
             videoView1.MediaPlayer = _mediaPlayer;
 
-            //// Video frame geldiğinde zaman damgasını güncelle
-            //_mediaPlayer.TimeChanged += (s, e) =>
-            //{
-            //    _lastVideoUpdateTime = DateTime.Now;
-            //};
+            // Video frame geldiğinde zaman damgasını güncelle
+            _mediaPlayer.TimeChanged += (s, e) =>
+            {
+                _lastVideoUpdateTime = DateTime.Now;
+            };
 
             _frameCaptureTimer = new Timer { Interval = 2000 };
             _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
 
-            //// Stream sağlık kontrol timer
-            //_streamHealthTimer = new Timer { Interval = 5000 }; // 5 saniyede bir kontrol
-            //_streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
+            // Stream sağlık kontrol timer
+            _streamHealthTimer = new Timer { Interval = 900000 }; // 15 dakikada bir kontrol
+            _streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
+
+            // Veri tabanı yöneticisini başlat
+            _databaseManager = new DatabaseManager();
+            Console.WriteLine("Veri tabanı başlatıldı.");
         }
 
         private void btnStart_Click(object sender, EventArgs e)
         {
             _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
-            Debug.WriteLine($"Media oynatıcısı başlatıldı: {DateTime.Now}");
+            Console.WriteLine($"Media oynatıcısı başlatıldı: {DateTime.Now}");
             _frameCaptureTimer.Start();
 
-            //_lastVideoUpdateTime = DateTime.Now;
-            //_streamHealthTimer.Start();
+            _lastVideoUpdateTime = DateTime.Now;
+            _streamHealthTimer.Start();
         }
 
         private void FrameCaptureTimer_Tick(object sender, EventArgs e)
@@ -93,18 +100,54 @@ namespace WinForms_RTSP_Player
                 {
                     string result = PlateRecognitionHelper.RunOpenALPR(tempPath);
                     string plate = PlateRecognitionHelper.ExtractPlateFromJson(result);
-                    lblPlate.Text = !string.IsNullOrEmpty(plate) ? $"Tespit Edilen Plaka: {plate}" : "Tespit Edilen Plaka: ---";
-                    Debug.WriteLine($"*******************{DateTime.Now}****************************");
-                    Debug.WriteLine($"OCR okunan: {result}");
-                    Debug.WriteLine($"-----");
-                    Debug.WriteLine($"Tespit Edilen Plaka: {plate}");
+                    
+                    if (!string.IsNullOrEmpty(plate) && plate != "Plaka geçersiz veya okunamadı.")
+                    {
+                        // Plakayı düzelt (Türk formatına uygun hale getir)
+                        string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plate);
+                        
+                        // Veri tabanında kontrol et
+                        bool isAuthorized = _databaseManager.IsPlateAuthorized(correctedPlate);
+                        
+                        // Sonucu ekranda göster
+                        string status = isAuthorized ? "✅ İZİNLİ" : "❌ İZİNSİZ";
+                        lblPlate.Text = $"Tespit Edilen Plaka: {correctedPlate} - {status}";
+                        
+                        // Erişim logunu kaydet
+                        _databaseManager.LogAccess(correctedPlate, "IN", isAuthorized);
+                        
+                        // Sistem logunu kaydet
+                        string logMessage = isAuthorized ? 
+                            $"İzinli araç girişi: {correctedPlate}" : 
+                            $"İzinsiz araç girişi: {correctedPlate}";
+                        _databaseManager.LogSystem("INFO", logMessage);
+                        
+                        Console.WriteLine($"*******************{DateTime.Now}****************************");
+                        Console.WriteLine($"OCR okunan: {result}");
+                        Console.WriteLine($"-----");
+                        Console.WriteLine($"Düzeltilmiş Plaka: {correctedPlate}");
+                        Console.WriteLine($"Yetki Durumu: {status}");
+                        
+                        // Eğer izinliyse kapıyı aç (bu kısmı daha sonra ekleyeceğiz)
+                        if (isAuthorized)
+                        {
+                            Console.WriteLine("🚪 Kapı açılıyor...");
+                            // TODO: Kapı açma kodu buraya gelecek
+                        }
+                    }
+                    else
+                    {
+                        lblPlate.Text = "Tespit Edilen Plaka: ---";
+                        Console.WriteLine("🎯 Plaka okunamadı veya geçersiz.");
+                    }
+                    
                     File.Delete(tempPath);
                 }
-                else Debug.WriteLine("🎯 Ekran görüntüsü alınamadı veya dosya bulunamadı.");
+                else Console.WriteLine("🎯 Ekran görüntüsü alınamadı veya dosya bulunamadı.");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("Hata: " + ex.Message);
+                Console.WriteLine("Hata: " + ex.Message);
             }
         }
 
@@ -113,8 +156,8 @@ namespace WinForms_RTSP_Player
             _frameCaptureTimer.Stop();
             _frameCaptureTimer.Dispose();
 
-            //_streamHealthTimer.Stop();
-            //_streamHealthTimer.Dispose();
+            _streamHealthTimer.Stop();
+            _streamHealthTimer.Dispose();
 
             _mediaPlayer.Stop();
             _mediaPlayer.Dispose();
@@ -127,26 +170,26 @@ namespace WinForms_RTSP_Player
             testForm.Show();
         }
 
-        //private void CheckStreamHealth()
-        //{
-        //    var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
+        private void CheckStreamHealth()
+        {
+            var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
 
-        //    if (secondsSinceLastFrame > 3) // 3 saniye boyunca yeni frame gelmediyse
-        //    {
-        //        Debug.WriteLine($"⚠ Frame akışı {secondsSinceLastFrame:F1} sn durdu. RTSP yeniden başlatılıyor...{DateTime.Now}");
-        //        try
-        //        {
-        //            _mediaPlayer.Stop();
-        //            _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
-        //            Debug.WriteLine($"Media oynatıcısı başlatıldı: {DateTime.Now}");
-        //            _lastVideoUpdateTime = DateTime.Now;
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            Debug.WriteLine("🎯 Yeniden bağlantı hatası: " + ex.Message);
-        //        }
-        //    }
-        //}
+            if (secondsSinceLastFrame > 3) // 3 saniye boyunca yeni frame gelmediyse
+            {
+                Console.WriteLine($"⚠ Frame akışı {secondsSinceLastFrame:F1} sn durdu. RTSP yeniden başlatılıyor...{DateTime.Now}");
+                try
+                {
+                    _mediaPlayer.Stop();
+                    _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
+                    Console.WriteLine($"Media oynatıcısı başlatıldı: {DateTime.Now}");
+                    _lastVideoUpdateTime = DateTime.Now;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("🎯 Yeniden bağlantı hatası: " + ex.Message);
+                }
+            }
+        }
 
     }
 }

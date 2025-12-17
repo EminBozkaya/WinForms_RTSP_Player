@@ -97,8 +97,8 @@ namespace WinForms_RTSP_Player.Data
                         OwnerName TEXT,
                         VehicleType TEXT,
                         IsActive INTEGER DEFAULT 1,
-                        CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        UpdatedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+                        CreatedDate DATETIME DEFAULT (datetime('now', 'localtime')),
+                        UpdatedDate DATETIME DEFAULT (datetime('now', 'localtime'))
                     )";
 
                 // Giriş/çıkış log tablosu
@@ -108,7 +108,7 @@ namespace WinForms_RTSP_Player.Data
                         PlateNumber TEXT NOT NULL,
                         PlateOwner TEXT,
                         AccessType TEXT NOT NULL, -- 'IN' veya 'OUT'
-                        AccessTime DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        AccessTime DATETIME DEFAULT (datetime('now', 'localtime')),
                         IsAuthorized INTEGER DEFAULT 0,
                         Confidence REAL,
                         Notes TEXT
@@ -120,7 +120,7 @@ namespace WinForms_RTSP_Player.Data
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         LogLevel TEXT NOT NULL, -- 'INFO', 'WARNING', 'ERROR'
                         Message TEXT NOT NULL,
-                        LogTime DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        LogTime DATETIME DEFAULT (datetime('now', 'localtime')),
                         Details TEXT
                     )";
 
@@ -168,8 +168,8 @@ namespace WinForms_RTSP_Player.Data
                 {
                     connection.Open();
                     string query = @"
-                        INSERT INTO Plates (PlateNumber, OwnerName, VehicleType) 
-                        VALUES (@PlateNumber, @OwnerName, @VehicleType)";
+                        INSERT INTO Plates (PlateNumber, OwnerName, VehicleType, CreatedDate, UpdatedDate) 
+                        VALUES (@PlateNumber, @OwnerName, @VehicleType, datetime('now', 'localtime'), datetime('now', 'localtime'))";
 
                     using (var command = new SqliteCommand(query, connection))
                     {
@@ -200,7 +200,7 @@ namespace WinForms_RTSP_Player.Data
                         SET PlateNumber = @PlateNumber, 
                             OwnerName = @OwnerName, 
                             VehicleType = @VehicleType,
-                            UpdatedDate = CURRENT_TIMESTAMP
+                            UpdatedDate = datetime('now', 'localtime')
                         WHERE Id = @Id";
 
                     using (var command = new SqliteCommand(query, connection))
@@ -228,7 +228,7 @@ namespace WinForms_RTSP_Player.Data
                 using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = "UPDATE Plates SET IsActive = 0, UpdatedDate = CURRENT_TIMESTAMP WHERE Id = @Id";
+                    string query = "UPDATE Plates SET IsActive = 0, UpdatedDate = datetime('now', 'localtime') WHERE Id = @Id";
 
                     using (var command = new SqliteCommand(query, connection))
                     {
@@ -301,8 +301,8 @@ namespace WinForms_RTSP_Player.Data
                 {
                     connection.Open();
                     string query = @"
-                        INSERT INTO AccessLog (PlateNumber, PlateOwner, AccessType, IsAuthorized, Confidence) 
-                        VALUES (@PlateNumber, @PlateOwner, @AccessType, @IsAuthorized, @Confidence)";
+                        INSERT INTO AccessLog (PlateNumber, PlateOwner, AccessType, IsAuthorized, Confidence, AccessTime) 
+                        VALUES (@PlateNumber, @PlateOwner, @AccessType, @IsAuthorized, @Confidence, datetime('now', 'localtime'))";
 
                     using (var command = new SqliteCommand(query, connection))
                     {
@@ -330,7 +330,7 @@ namespace WinForms_RTSP_Player.Data
                     connection.Open();
                     string query = @"
                 INSERT INTO SystemLog (LogLevel, Message, LogTime, Component, Details) 
-                VALUES (@LogLevel, @Message, CURRENT_TIMESTAMP, @Component, @Details)";
+                VALUES (@LogLevel, @Message, datetime('now', 'localtime'), @Component, @Details)";
 
                     using (var command = new SqliteCommand(query, connection))
                     {

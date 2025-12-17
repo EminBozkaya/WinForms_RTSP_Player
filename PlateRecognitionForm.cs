@@ -20,7 +20,6 @@ namespace WinForms_RTSP_Player
         private System.Windows.Forms.Timer _streamHealthTimer;          // Stream sağlığı için timer
         private DateTime _lastVideoUpdateTime;     // Son video frame zaman damgası
 
-        //private string _rtspUrl = "rtsp://192.168.0.101/user=admin_password=tlJwpbo6_channel=1_stream=0.sdp?real_stream";//Eski kamera
         private string _rtspUrl = string.Empty; // RTSP URL'si App.config'den alınacak
 
         private DatabaseManager _databaseManager; // Veri tabanı yöneticisi

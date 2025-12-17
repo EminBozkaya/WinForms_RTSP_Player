@@ -23,6 +23,52 @@ namespace WinForms_RTSP_Player.Data
             {
                 CreateDatabase();
             }
+            ////Bazı Tablolarda sütun ekleme çıkarma yaptığımzda kullanılacak ve ilgili metot düzeltilecek!!
+            //else
+            //{
+            //    UpdateSchema();
+            //}
+        }
+
+        private void UpdateSchema()
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    // AccessLog tablosunda PlateOwner kontrolü
+                    bool columnExists = false;
+                    using (var command = new SqliteCommand("PRAGMA table_info(AccessLog)", connection))
+                    {
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader["name"].ToString() == "PlateOwner")
+                                {
+                                    columnExists = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!columnExists)
+                    {
+                        using (var command = new SqliteCommand("ALTER TABLE AccessLog ADD COLUMN PlateOwner TEXT", connection))
+                        {
+                            command.ExecuteNonQuery();
+                        }
+                        //Console.WriteLine("Şema güncellendi: PlateOwner kolonu eklendi.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Şema güncelleme hatası: {ex.Message}");
+            }
         }
 
         private void CreateDatabase()
@@ -82,7 +128,7 @@ namespace WinForms_RTSP_Player.Data
                 }
 
                 // Örnek plaka verileri ekle
-                //InsertSamplePlates();
+                InsertSamplePlates();
             }
         }
 
@@ -211,7 +257,31 @@ namespace WinForms_RTSP_Player.Data
             }
         }
 
-        public void LogAccess(string plateNumber, string accessType, bool isAuthorized, double confidence = 0)
+        public string GetPlateOwner(string plateNumber)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "SELECT OwnerName FROM Plates WHERE PlateNumber = @PlateNumber AND IsActive = 1";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@PlateNumber", plateNumber);
+                        var result = command.ExecuteScalar();
+                        return result != null ? result.ToString() : "";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Araç sahibi bulma hatası: {ex.Message}");
+                return "";
+            }
+        }
+
+        public void LogAccess(string plateNumber, string plateOwner, string accessType, bool isAuthorized, double confidence = 0)
         {
             try
             {
@@ -219,12 +289,13 @@ namespace WinForms_RTSP_Player.Data
                 {
                     connection.Open();
                     string query = @"
-                        INSERT INTO AccessLog (PlateNumber, AccessType, IsAuthorized, Confidence) 
-                        VALUES (@PlateNumber, @AccessType, @IsAuthorized, @Confidence)";
+                        INSERT INTO AccessLog (PlateNumber, PlateOwner, AccessType, IsAuthorized, Confidence) 
+                        VALUES (@PlateNumber, @PlateOwner, @AccessType, @IsAuthorized, @Confidence)";
 
                     using (var command = new SqliteCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@PlateNumber", plateNumber);
+                        command.Parameters.AddWithValue("@PlateOwner", plateOwner ?? "");
                         command.Parameters.AddWithValue("@AccessType", accessType);
                         command.Parameters.AddWithValue("@IsAuthorized", isAuthorized ? 1 : 0);
                         command.Parameters.AddWithValue("@Confidence", confidence);

@@ -108,7 +108,13 @@ namespace WinForms_RTSP_Player
                         string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plateResult.Plate);
                         
                         // Veri tabanında kontrol et
+                        string plateOwner = "";
                         bool isAuthorized = _databaseManager.IsPlateAuthorized(correctedPlate);
+                        
+                        if (isAuthorized)
+                        {
+                             plateOwner = _databaseManager.GetPlateOwner(correctedPlate);
+                        }
                         
                         // Sonucu ekranda göster
                         string status = isAuthorized ? "✅ İZİNLİ" : "❌ İZİNSİZ";
@@ -122,13 +128,14 @@ namespace WinForms_RTSP_Player
                         lblStatus.ForeColor = statusColor;
                         
                         // Erişim logunu kaydet
-                        _databaseManager.LogAccess(correctedPlate, "IN", isAuthorized, plateResult.Confidence);
+                        _databaseManager.LogAccess(correctedPlate, plateOwner, "IN", isAuthorized, plateResult.Confidence);
                         
                         
                         Console.WriteLine($"*******************{DateTime.Now}****************************");
                         Console.WriteLine($"OCR okunan: {result}");
                         Console.WriteLine($"-----");
                         Console.WriteLine($"Düzeltilmiş Plaka: {correctedPlate}");
+                        Console.WriteLine($"Araç Sahibi: {plateOwner}");
                         Console.WriteLine($"Yetki Durumu: {status}");
                         
                         // Eğer izinliyse kapıyı aç (bu kısmı daha sonra ekleyeceğiz)

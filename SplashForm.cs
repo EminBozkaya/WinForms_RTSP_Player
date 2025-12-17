@@ -16,13 +16,10 @@ namespace WinForms_RTSP_Player
             var loginForm = new LoginForm();
             if (loginForm.ShowDialog() == DialogResult.OK)
             {
-                // TODO: AdminForm henüz oluşturulmadı
-                MessageBox.Show("Yönetim Paneli henüz geliştirilme aşamasında!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                /*
                 var adminForm = new AdminForm();
+                adminForm.FormClosed += (s, args) => this.Show();
                 adminForm.Show();
                 this.Hide();
-                */
             }
         }
 

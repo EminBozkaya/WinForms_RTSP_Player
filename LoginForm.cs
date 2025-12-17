@@ -41,8 +41,8 @@ namespace WinForms_RTSP_Player
             string password = txtPassword.Text.Trim();
 
             // Kullanıcı adı: admin, Şifre: Park evleri
-            if (username.Equals("admin", StringComparison.OrdinalIgnoreCase) && 
-                password.Equals("Park evleri", StringComparison.OrdinalIgnoreCase))
+            if (username.Equals("a", StringComparison.OrdinalIgnoreCase) && 
+                password.Equals("p", StringComparison.OrdinalIgnoreCase))
             {
                 this.DialogResult = DialogResult.OK;
                 this.Close();

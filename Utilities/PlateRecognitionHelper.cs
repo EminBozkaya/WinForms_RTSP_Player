@@ -37,7 +37,49 @@ namespace WinForms_RTSP_Player.Utilities
             }
         }
 
-        public static string ExtractPlateFromJson(string json)
+        //public static string ExtractPlateFromJson(string json)
+        //{
+        //    try
+        //    {
+        //        var j = JObject.Parse(json);
+        //        var results = j["results"];
+        //        if (results != null && results.HasValues)
+        //        {
+        //            // Tüm candidate'ları topla
+        //            var allCandidates = new List<(string plate, double confidence)>();
+
+        //            foreach (var result in results)
+        //            {
+        //                var candidates = result["candidates"];
+        //                if (candidates != null && candidates.HasValues)
+        //                {
+        //                    foreach (var candidate in candidates)
+        //                    {
+        //                        string plate = candidate["plate"]?.ToString();
+        //                        double confidence = candidate["confidence"]?.Value<double>() ?? 0;
+
+        //                        if (!string.IsNullOrEmpty(plate))
+        //                        {
+        //                            allCandidates.Add((plate, confidence));
+        //                        }
+        //                    }
+        //                }
+        //            }
+
+        //            // En iyi plakayı seç
+        //            string bestPlate = SelectBestPlate(allCandidates);
+
+        //            if (string.IsNullOrEmpty(bestPlate))
+        //                return "Plaka geçersiz veya okunamadı.";
+
+        //            return bestPlate;
+        //        }
+        //    }
+        //    catch { }
+
+        //    return null;
+        //}
+        public static PlateResult ExtractPlateFromJson(string json)
         {
             try
             {
@@ -45,92 +87,145 @@ namespace WinForms_RTSP_Player.Utilities
                 var results = j["results"];
                 if (results != null && results.HasValues)
                 {
-                    // Tüm candidate'ları topla
                     var allCandidates = new List<(string plate, double confidence)>();
-                    
                     foreach (var result in results)
                     {
                         var candidates = result["candidates"];
-                        if (candidates != null && candidates.HasValues)
+                        if (candidates != null)
                         {
                             foreach (var candidate in candidates)
                             {
                                 string plate = candidate["plate"]?.ToString();
                                 double confidence = candidate["confidence"]?.Value<double>() ?? 0;
-                                
-                                if (!string.IsNullOrEmpty(plate))
-                                {
-                                    allCandidates.Add((plate, confidence));
-                                }
+                                if (!string.IsNullOrEmpty(plate)) allCandidates.Add((plate, confidence));
                             }
                         }
                     }
-                    
-                    // En iyi plakayı seç
-                    string bestPlate = SelectBestPlate(allCandidates);
-                    
-                    if (string.IsNullOrEmpty(bestPlate))
-                        return "Plaka geçersiz veya okunamadı.";
-                    
-                    return bestPlate;
+
+                    return SelectBestPlate(allCandidates);
                 }
             }
-            catch { }
-
+            catch (Exception ex) { Console.WriteLine("JSON Parse Hatası: " + ex.Message); }
             return null;
         }
-        
-        private static string SelectBestPlate(List<(string plate, double confidence)> candidates)
+
+        private static PlateResult SelectBestPlate(List<(string plate, double confidence)> candidates)
         {
-            if (candidates == null || candidates.Count == 0)
-                return null;
-                
-            // 1. Confidence skoruna göre sırala (yüksekten düşüğe)
+            if (candidates == null || candidates.Count == 0) return null;
+
             candidates = candidates.OrderByDescending(c => c.confidence).ToList();
-            
-            // 2. En yüksek confidence'ı al
+
+            // En iyi adayın %80'inden fazlasını al
             var topCandidates = candidates.Where(c => c.confidence >= candidates[0].confidence * 0.8).ToList();
-            
-            // 3. Karakter bazında analiz yap
+
             if (topCandidates.Count > 1)
             {
                 return AnalyzeByCharacterSimilarity(topCandidates);
             }
-            
-            return topCandidates[0].plate;
+
+            return new PlateResult { Plate = topCandidates[0].plate, Confidence = topCandidates[0].confidence };
         }
-        
-        private static string AnalyzeByCharacterSimilarity(List<(string plate, double confidence)> candidates)
+
+        //private static string SelectBestPlate(List<(string plate, double confidence)> candidates)
+        //{
+        //    if (candidates == null || candidates.Count == 0)
+        //        return null;
+
+        //    // 1. Confidence skoruna göre sırala (yüksekten düşüğe)
+        //    candidates = candidates.OrderByDescending(c => c.confidence).ToList();
+
+        //    // 2. En yüksek confidence'ı al
+        //    var topCandidates = candidates.Where(c => c.confidence >= candidates[0].confidence * 0.8).ToList();
+
+        //    // 3. Karakter bazında analiz yap
+        //    if (topCandidates.Count > 1)
+        //    {
+        //        return AnalyzeByCharacterSimilarity(topCandidates);
+        //    }
+
+        //    return topCandidates[0].plate;
+        //}
+
+        private static PlateResult AnalyzeByCharacterSimilarity(List<(string plate, double confidence)> candidates)
         {
-            // En uzun plaka uzunluğunu bul
             int maxLength = candidates.Max(c => c.plate.Length);
-            
-            // Her pozisyon için en çok tekrar eden karakteri bul
             var finalPlate = new char[maxLength];
-            
+            double totalConfidenceSum = 0;
+
             for (int i = 0; i < maxLength; i++)
             {
                 var charVotes = new Dictionary<char, double>();
-                
+                double positionTotalVotes = 0;
+
                 foreach (var candidate in candidates)
                 {
                     if (i < candidate.plate.Length)
                     {
                         char c = candidate.plate[i];
-                        if (!charVotes.ContainsKey(c))
-                            charVotes[c] = 0;
+                        if (!charVotes.ContainsKey(c)) charVotes[c] = 0;
+
                         charVotes[c] += candidate.confidence;
+                        positionTotalVotes += candidate.confidence; // Bu pozisyondaki toplam ağırlık
                     }
                 }
-                
-                // En yüksek oy alan karakteri seç
+
                 if (charVotes.Count > 0)
                 {
-                    finalPlate[i] = charVotes.OrderByDescending(kvp => kvp.Value).First().Key;
+                    var bestChar = charVotes.OrderByDescending(kvp => kvp.Value).First();
+                    finalPlate[i] = bestChar.Key;
+
+                    // Bu karakterin bu pozisyondaki güven oranı (Örn: %95 baskın)
+                    double charConfidence = (bestChar.Value / positionTotalVotes);
+                    totalConfidenceSum += charConfidence;
                 }
             }
+
+            // Genel skor: Karakter bazlı güvenlerin ortalaması
+            double finalConfidence = (totalConfidenceSum / maxLength) * 100;
+
+            return new PlateResult
+            {
+                Plate = new string(finalPlate),
+                Confidence = Math.Round(finalConfidence, 2)
+            };
+        }
+        //private static string AnalyzeByCharacterSimilarity(List<(string plate, double confidence)> candidates)
+        //{
+        //    // En uzun plaka uzunluğunu bul
+        //    int maxLength = candidates.Max(c => c.plate.Length);
             
-            return new string(finalPlate);
+        //    // Her pozisyon için en çok tekrar eden karakteri bul
+        //    var finalPlate = new char[maxLength];
+            
+        //    for (int i = 0; i < maxLength; i++)
+        //    {
+        //        var charVotes = new Dictionary<char, double>();
+                
+        //        foreach (var candidate in candidates)
+        //        {
+        //            if (i < candidate.plate.Length)
+        //            {
+        //                char c = candidate.plate[i];
+        //                if (!charVotes.ContainsKey(c))
+        //                    charVotes[c] = 0;
+        //                charVotes[c] += candidate.confidence;
+        //            }
+        //        }
+                
+        //        // En yüksek oy alan karakteri seç
+        //        if (charVotes.Count > 0)
+        //        {
+        //            finalPlate[i] = charVotes.OrderByDescending(kvp => kvp.Value).First().Key;
+        //        }
+        //    }
+            
+        //    return new string(finalPlate);
+        //}
+
+        public class PlateResult
+        {
+            public string Plate { get; set; }
+            public double Confidence { get; set; }
         }
     }
 

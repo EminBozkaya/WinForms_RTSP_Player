@@ -61,8 +61,11 @@ namespace WinForms_RTSP_Player
 
         private void btnAdd_Click(object sender, EventArgs e)
         {
-            // Placeholder for Add logic
-            MessageBox.Show("Yeni araç ekleme formu burada açılacak.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            AddPlateForm addForm = new AddPlateForm();
+            if (addForm.ShowDialog() == DialogResult.OK)
+            {
+                LoadPlates(); // Refresh grid
+            }
         }
 
         private void btnEdit_Click(object sender, EventArgs e)
@@ -70,8 +73,16 @@ namespace WinForms_RTSP_Player
             if (dataGridViewPlates.SelectedRows.Count > 0)
             {
                 var row = dataGridViewPlates.SelectedRows[0];
+                int id = Convert.ToInt32(row.Cells["Id"].Value);
                 string plate = row.Cells["PlateNumber"].Value.ToString();
-                MessageBox.Show($"'{plate}' plakalı aracı düzenleme formu burada açılacak.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string owner = row.Cells["OwnerName"].Value.ToString();
+                string type = row.Cells["VehicleType"].Value.ToString();
+
+                AddPlateForm editForm = new AddPlateForm(id, plate, owner, type);
+                if (editForm.ShowDialog() == DialogResult.OK)
+                {
+                    LoadPlates(); // Refresh grid
+                }
             }
             else
             {
@@ -89,8 +100,16 @@ namespace WinForms_RTSP_Player
                 
                 if (result == DialogResult.Yes)
                 {
-                    // TODO: Implement actual delete in DatabaseManager
-                    MessageBox.Show("Silme işlemi henüz aktif değil (Database update required).", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    int id = Convert.ToInt32(row.Cells["Id"].Value);
+                    if (_dbManager.SoftDeletePlate(id))
+                    {
+                        MessageBox.Show("Kayıt başarıyla silindi.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        LoadPlates();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Silme işlemi sırasında hata oluştu.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             }
             else

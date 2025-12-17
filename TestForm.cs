@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using WinForms_RTSP_Player.Utilities;
-using System.Linq;
-using System.Collections.Generic;
+using static WinForms_RTSP_Player.Utilities.PlateRecognitionHelper;
 
 namespace WinForms_RTSP_Player
 {
@@ -129,12 +130,12 @@ namespace WinForms_RTSP_Player
 
                 // OpenALPR ile analiz et
                 string result = PlateRecognitionHelper.RunOpenALPR(imagePath);
-                string plate = PlateRecognitionHelper.ExtractPlateFromJson(result);
+                PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
                 
-                if (!string.IsNullOrEmpty(plate) && plate != "Plaka geçersiz veya okunamadı.")
+                if (plateResult != null && !string.IsNullOrEmpty(plateResult.Plate) && plateResult.Plate != "Plaka geçersiz veya okunamadı.")
                 {
                     // Plakayı düzelt (Türk formatına uygun hale getir)
-                    string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plate);
+                    string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plateResult.Plate);
                     
                     if (!string.IsNullOrEmpty(correctedPlate))
                     {

@@ -1,13 +1,14 @@
+using LibVLCSharp.Shared;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Configuration;
+using System.Drawing;
 //using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
-using LibVLCSharp.Shared;
-using Newtonsoft.Json.Linq;
-using WinForms_RTSP_Player.Utilities;
 using WinForms_RTSP_Player.Data;
-using System.Configuration;
-using System.Drawing;
+using WinForms_RTSP_Player.Utilities;
+using static WinForms_RTSP_Player.Utilities.PlateRecognitionHelper;
 
 namespace WinForms_RTSP_Player
 {
@@ -99,12 +100,12 @@ namespace WinForms_RTSP_Player
                 if (success && File.Exists(tempPath))
                 {
                     string result = PlateRecognitionHelper.RunOpenALPR(tempPath);
-                    string plate = PlateRecognitionHelper.ExtractPlateFromJson(result);
+                    PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
                     
-                    if (!string.IsNullOrEmpty(plate) && plate != "Plaka geçersiz veya okunamadı.")
+                    if (plateResult != null && !string.IsNullOrEmpty(plateResult.Plate) && plateResult.Plate != "Plaka geçersiz veya okunamadı.")
                     {
                         // Plakayı düzelt (Türk formatına uygun hale getir)
-                        string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plate);
+                        string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plateResult.Plate);
                         
                         // Veri tabanında kontrol et
                         bool isAuthorized = _databaseManager.IsPlateAuthorized(correctedPlate);
@@ -121,13 +122,8 @@ namespace WinForms_RTSP_Player
                         lblStatus.ForeColor = statusColor;
                         
                         // Erişim logunu kaydet
-                        _databaseManager.LogAccess(correctedPlate, "IN", isAuthorized);
+                        _databaseManager.LogAccess(correctedPlate, "IN", isAuthorized, plateResult.Confidence);
                         
-                        // Sistem logunu kaydet
-                        string logMessage = isAuthorized ? 
-                            $"İzinli araç girişi: {correctedPlate}" : 
-                            $"İzinsiz araç girişi: {correctedPlate}";
-                        _databaseManager.LogSystem("INFO", logMessage);
                         
                         Console.WriteLine($"*******************{DateTime.Now}****************************");
                         Console.WriteLine($"OCR okunan: {result}");

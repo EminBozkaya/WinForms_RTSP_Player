@@ -48,6 +48,7 @@ namespace WinForms_RTSP_Player.Data
                     CREATE TABLE AccessLog (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         PlateNumber TEXT NOT NULL,
+                        PlateOwner TEXT,
                         AccessType TEXT NOT NULL, -- 'IN' veya 'OUT'
                         AccessTime DATETIME DEFAULT CURRENT_TIMESTAMP,
                         IsAuthorized INTEGER DEFAULT 0,
@@ -81,7 +82,7 @@ namespace WinForms_RTSP_Player.Data
                 }
 
                 // Örnek plaka verileri ekle
-                InsertSamplePlates();
+                //InsertSamplePlates();
             }
         }
 
@@ -125,6 +126,63 @@ namespace WinForms_RTSP_Player.Data
             catch (Exception ex)
             {
                 Console.WriteLine($"Plaka ekleme hatası: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool UpdatePlate(int id, string plateNumber, string ownerName, string vehicleType)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                        UPDATE Plates 
+                        SET PlateNumber = @PlateNumber, 
+                            OwnerName = @OwnerName, 
+                            VehicleType = @VehicleType,
+                            UpdatedDate = CURRENT_TIMESTAMP
+                        WHERE Id = @Id";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", id);
+                        command.Parameters.AddWithValue("@PlateNumber", plateNumber);
+                        command.Parameters.AddWithValue("@OwnerName", ownerName);
+                        command.Parameters.AddWithValue("@VehicleType", vehicleType);
+                        command.ExecuteNonQuery();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Plaka güncelleme hatası: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool SoftDeletePlate(int id)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "UPDATE Plates SET IsActive = 0, UpdatedDate = CURRENT_TIMESTAMP WHERE Id = @Id";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", id);
+                        command.ExecuteNonQuery();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Plaka silme hatası: {ex.Message}");
                 return false;
             }
         }

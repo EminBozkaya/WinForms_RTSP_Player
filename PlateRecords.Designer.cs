@@ -21,6 +21,7 @@ namespace WinForms_RTSP_Player
             this.panelButtons = new System.Windows.Forms.Panel();
             this.btnAdd = new System.Windows.Forms.Button();
             this.btnEdit = new System.Windows.Forms.Button();
+
             this.btnDelete = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewPlates)).BeginInit();
             this.panelButtons.SuspendLayout();
@@ -88,6 +89,7 @@ namespace WinForms_RTSP_Player
             this.btnEdit.Text = "Seçileni Düzenle";
             this.btnEdit.UseVisualStyleBackColor = false;
             this.btnEdit.Click += new System.EventHandler(this.btnEdit_Click);
+
             // 
             // btnDelete
             // 

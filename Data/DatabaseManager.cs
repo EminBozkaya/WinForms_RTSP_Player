@@ -128,7 +128,7 @@ namespace WinForms_RTSP_Player.Data
                 }
 
                 // Örnek plaka verileri ekle
-                InsertSamplePlates();
+                //InsertSamplePlates();
             }
         }
 

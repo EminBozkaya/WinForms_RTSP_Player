@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Configuration;
 
 namespace WinForms_RTSP_Player
 {
@@ -41,15 +42,19 @@ namespace WinForms_RTSP_Player
             string password = txtPassword.Text.Trim();
 
             // Kullanıcı adı: admin, Şifre: Park evleri
-            if (username.Equals("a", StringComparison.OrdinalIgnoreCase) && 
-                password.Equals("p", StringComparison.OrdinalIgnoreCase))
+            string configUsername = ConfigurationManager.AppSettings["Username"];
+            string configPassword = ConfigurationManager.AppSettings["Password"];
+
+            // Kullanıcı adı: admin, Şifre: Park evleri
+            if (username.Equals(configUsername, StringComparison.OrdinalIgnoreCase) && 
+                password.Equals(configPassword, StringComparison.OrdinalIgnoreCase))
             {
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             else
             {
-                MessageBox.Show("Kullanıcı adı veya şifre hatalı!\n\nKullanıcı Adı: admin\nŞifre: Park evleri", 
+                MessageBox.Show("Kullanıcı adı veya şifre hatalı!", 
                     "Giriş Hatası", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 
                 txtPassword.Clear();

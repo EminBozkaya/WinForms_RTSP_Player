@@ -17,6 +17,7 @@ namespace WinForms_RTSP_Player
         private LibVLC _libVLC;
         private MediaPlayer _mediaPlayer;
         private System.Windows.Forms.Timer _frameCaptureTimer;
+        private System.Windows.Forms.Timer _heartbeatTimer;
 
         private System.Windows.Forms.Timer _streamHealthTimer;          // Stream sağlığı için timer
         private DateTime _lastVideoUpdateTime;     // Son video frame zaman damgası
@@ -69,6 +70,10 @@ namespace WinForms_RTSP_Player
                 _streamHealthTimer = new System.Windows.Forms.Timer { Interval = 900000 }; // 15 dakikada bir kontrol
                 _streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
 
+                // Heartbeat timer (5 dakika)
+                _heartbeatTimer = new System.Windows.Forms.Timer { Interval = 300000 };
+                _heartbeatTimer.Tick += (s, e) => DatabaseManager.Instance.LogSystem("INFO", "System Alive", "PlateRecognitionForm.Heartbeat");
+
                 // Veri tabanı yöneticisini başlat - Singleton kullanılıyor ama form içinde field olarak tutuluyordu, yine field'a atayabiliriz veya direkt Instance kullanabiliriz.
                 // Mevcut kod field kullanıyor, uyumlu olması için atama yapıyoruz.
                 _databaseManager = DatabaseManager.Instance;
@@ -90,6 +95,8 @@ namespace WinForms_RTSP_Player
 
                 _lastVideoUpdateTime = DateTime.Now;
                 _streamHealthTimer.Start();
+                _heartbeatTimer.Start();
+                DatabaseManager.Instance.LogSystem("INFO", "Heartbeat timer başlatıldı (5 dk aralıkla)", "PlateRecognitionForm.btnStart_Click");
             }
             catch (Exception ex)
             {
@@ -180,6 +187,9 @@ namespace WinForms_RTSP_Player
 
                 _streamHealthTimer.Stop();
                 _streamHealthTimer.Dispose();
+
+                _heartbeatTimer.Stop();
+                _heartbeatTimer.Dispose();
 
                 _mediaPlayer.Stop();
                 _mediaPlayer.Dispose();

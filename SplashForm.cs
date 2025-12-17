@@ -40,10 +40,24 @@ namespace WinForms_RTSP_Player
         {
             try
             {
-                var plateRecognitionForm = new PlateRecognitionForm();
-                plateRecognitionForm.FormClosed += (s, args) => this.Show();
-                plateRecognitionForm.Show();
+                // PlateRecognitionForm'un zaten açık olup olmadığını kontrol et
+                var existingForm = Application.OpenForms["PlateRecognitionForm"];
+                if (existingForm != null)
+                {
+                    // Zaten açıksa ön plana getir
+                    existingForm.Show();
+                    existingForm.BringToFront();
+                }
+                else
+                {
+                    // Yeni PlateRecognitionForm aç (modeless)
+                    var plateRecognitionForm = new PlateRecognitionForm();
+                    plateRecognitionForm.Show();
+                }
+                
+                // SplashForm'u gizle (kapatma, böylece Application.OpenForms'da kalır)
                 this.Hide();
+                
                 WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("INFO", "Plaka tanıma ekranı geçişi", "SplashForm.BtnPlateRecognition_Click");
             }
             catch (Exception ex)

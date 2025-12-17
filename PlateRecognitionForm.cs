@@ -270,8 +270,22 @@ namespace WinForms_RTSP_Player
         {
             try
             {
-                this.Close();
-                // SplashForm Program.cs üzerinden kontrol edilebilir veya burada manually açılabilir ama genelde Close yeterli.
+                // PlateRecognitionForm'u kapatma, sadece SplashForm'u göster
+                // PlateRecognitionForm arka planda çalışmaya devam edecek
+                var splashForm = Application.OpenForms["SplashForm"];
+                if (splashForm != null)
+                {
+                    splashForm.Show();
+                    splashForm.BringToFront();
+                }
+                else
+                {
+                    // SplashForm bulunamazsa yeni bir tane oluştur
+                    var newSplashForm = new SplashForm();
+                    newSplashForm.Show();
+                }
+                
+                DatabaseManager.Instance.LogSystem("INFO", "Ana sayfaya dönüldü (PlateRecognitionForm arka planda çalışıyor)", "PlateRecognitionForm.btnBack_Click");
             }
             catch (Exception ex)
             {

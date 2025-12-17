@@ -397,5 +397,119 @@ namespace WinForms_RTSP_Player.Data
                 return new DataTable();
             }
         }
+
+        public bool DeleteAccessLogs(List<int> ids)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            var command = connection.CreateCommand();
+                            command.Transaction = transaction;
+                            
+                            // Generate parameters dynamically
+                            var parameters = new List<string>();
+                            for (int i = 0; i < ids.Count; i++)
+                            {
+                                string paramName = $"@id{i}";
+                                parameters.Add(paramName);
+                                command.Parameters.AddWithValue(paramName, ids[i]);
+                            }
+
+                            command.CommandText = $"DELETE FROM AccessLog WHERE Id IN ({string.Join(",", parameters)})";
+                            command.ExecuteNonQuery();
+
+                            transaction.Commit();
+                            return true;
+                        }
+                        catch
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Log silme hatası: {ex.Message}");
+                LogSystem("ERROR", "Log silme başarısız", "DatabaseManager.DeleteAccessLogs", ex.Message);
+                return false;
+            }
+        }
+
+        public DataTable GetSystemLog(int limit = 1000)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = $"SELECT * FROM SystemLog ORDER BY LogTime DESC LIMIT {limit}";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    using (var reader = command.ExecuteReader())
+                    {
+                        var dataTable = new DataTable();
+                        dataTable.Load(reader);
+                        return dataTable;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Sistem log listesi alma hatası: {ex.Message}");
+                return new DataTable();
+            }
+        }
+
+        public bool DeleteSystemLogs(List<int> ids)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            var command = connection.CreateCommand();
+                            command.Transaction = transaction;
+                            
+                            // Generate parameters dynamically
+                            var parameters = new List<string>();
+                            for (int i = 0; i < ids.Count; i++)
+                            {
+                                string paramName = $"@id{i}";
+                                parameters.Add(paramName);
+                                command.Parameters.AddWithValue(paramName, ids[i]);
+                            }
+
+                            command.CommandText = $"DELETE FROM SystemLog WHERE Id IN ({string.Join(",", parameters)})";
+                            command.ExecuteNonQuery();
+
+                            transaction.Commit();
+                            return true;
+                        }
+                        catch
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Sistem log silme hatası: {ex.Message}");
+                return false;
+            }
+        }
     }
 } 

@@ -67,11 +67,11 @@ namespace WinForms_RTSP_Player
         {
             try
             {
-                MessageBox.Show("Araç Giriş/Çıkış Kayıtları henüz aktif değil.");
+                new VehicleIORecords().ShowDialog();
             }
             catch (Exception ex)
             {
-                WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Giriş/Çıkış buton hatası", "AdminForm.btnEntryExit_Click", ex.ToString());
+                WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Giriş/Çıkış kayıtları açma hatası", "AdminForm.btnEntryExit_Click", ex.ToString());
             }
         }
 
@@ -79,11 +79,11 @@ namespace WinForms_RTSP_Player
         {
             try
             {
-                MessageBox.Show("Sistem Genel Kayıtları henüz aktif değil.");
+                new SystemLogs().ShowDialog();
             }
             catch (Exception ex)
             {
-                WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Sistem logları buton hatası", "AdminForm.btnSystemLogs_Click", ex.ToString());
+                WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Sistem kayıtları açma hatası", "AdminForm.btnSystemLogs_Click", ex.ToString());
             }
         }
 

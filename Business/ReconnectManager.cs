@@ -1,7 +1,7 @@
 ﻿using LibVLCSharp.Shared;
 using System;
 //using System.Diagnostics;
-using System.Windows.Forms;
+using WinForms_RTSP_Player.Data;
 
 namespace WinForms_RTSP_Player.Business
 {
@@ -27,7 +27,7 @@ namespace WinForms_RTSP_Player.Business
 
         private void MediaPlayer_ConnectionIssue(object sender, EventArgs e)
         {
-            Console.WriteLine("RTSP bağlantı sorunu algılandı, yeniden bağlanılacak...");
+            DatabaseManager.Instance.LogSystem("WARNING", "RTSP bağlantı sorunu algılandı", "ReconnectManager.ConnectionIssue");
             StartReconnectLoop();
         }
 
@@ -45,18 +45,18 @@ namespace WinForms_RTSP_Player.Business
             {
                 try
                 {
-                    Console.WriteLine("RTSP yeniden bağlanma denemesi...");
+                    DatabaseManager.Instance.LogSystem("INFO", "RTSP yeniden bağlanma denemesi...", "ReconnectManager.AttemptReconnect");
                     _mediaPlayer.Play(_mediaFactory.Invoke());
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Yeniden bağlanma hatası: " + ex.Message);
+                    DatabaseManager.Instance.LogSystem("ERROR", "Yeniden bağlanma hatası", "ReconnectManager.AttemptReconnect", ex.ToString());
                 }
             }
             else
             {
                 _reconnectTimer.Stop();
-                Console.WriteLine("Yeniden bağlantı başarılı, timer durdu.");
+                DatabaseManager.Instance.LogSystem("INFO", "Yeniden bağlantı başarılı, timer durdu.", "ReconnectManager.AttemptReconnect");
             }
         }
 

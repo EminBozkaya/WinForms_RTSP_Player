@@ -116,7 +116,7 @@ namespace WinForms_RTSP_Player
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Resim yüklenirken hata: {ex.Message}");
+                WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Test resmi yükleme hatası", "TestForm.LoadCurrentImage", ex.ToString());
                 lblPlate.Text = "Tespit Edilen Plaka: Hata!";
             }
         }
@@ -161,7 +161,7 @@ namespace WinForms_RTSP_Player
             {
                 lblPlate.Text = "Tespit Edilen Plaka: Hata";
                 lblPlate.ForeColor = Color.FromArgb(244, 67, 54);
-                Console.WriteLine($"Plaka tanıma hatası: {ex.Message}");
+                WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Test OCR hatası", "TestForm.RecognizePlateFromImage", ex.ToString());
                 return "Hata";
             }
         }

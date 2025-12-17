@@ -27,67 +27,74 @@ namespace WinForms_RTSP_Player
 
         public PlateRecognitionForm()
         {
-            InitializeComponent();
-            Core.Initialize(@"libvlc\win-x64");
-
-            _rtspUrl = ConfigurationManager.AppSettings["RtspUrl"];
-            if (string.IsNullOrEmpty(_rtspUrl))
+            try
             {
-                MessageBox.Show("RTSP bağlantı adresi App.config dosyasında bulunamadı!");
-                return;
+                InitializeComponent();
+                Core.Initialize(@"libvlc\win-x64");
+
+                _rtspUrl = ConfigurationManager.AppSettings["RtspUrl"];
+                if (string.IsNullOrEmpty(_rtspUrl))
+                {
+                    MessageBox.Show("RTSP bağlantı adresi App.config dosyasında bulunamadı!");
+                    DatabaseManager.Instance.LogSystem("ERROR", "RTSP URL bulunamadı", "PlateRecognitionForm.Constructor");
+                    return;
+                }
+
+                var libvlcOptions = new[]
+                {
+                    "--network-caching=50",
+                    "--no-video-title-show",
+                    "--no-osd",
+                    "--no-snapshot-preview",
+                    "--avcodec-hw=dxva2",
+                    "--clock-synchro=1",
+                    "--clock-jitter=0",
+                };
+
+                _libVLC = new LibVLC(libvlcOptions);
+                _mediaPlayer = new MediaPlayer(_libVLC);
+                _mediaPlayer.Mute = true;
+                videoView1.MediaPlayer = _mediaPlayer;
+
+                // Video frame geldiğinde zaman damgasını güncelle
+                _mediaPlayer.TimeChanged += (s, e) =>
+                {
+                    _lastVideoUpdateTime = DateTime.Now;
+                };
+
+                _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 2000 };
+                _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
+
+                // Stream sağlık kontrol timer
+                _streamHealthTimer = new System.Windows.Forms.Timer { Interval = 900000 }; // 15 dakikada bir kontrol
+                _streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
+
+                // Veri tabanı yöneticisini başlat - Singleton kullanılıyor ama form içinde field olarak tutuluyordu, yine field'a atayabiliriz veya direkt Instance kullanabiliriz.
+                // Mevcut kod field kullanıyor, uyumlu olması için atama yapıyoruz.
+                _databaseManager = DatabaseManager.Instance;
+                DatabaseManager.Instance.LogSystem("INFO", "Plaka tanıma formu başlatıldı", "PlateRecognitionForm.Constructor");
             }
-
-            var libvlcOptions = new[]
+            catch (Exception ex)
             {
-                "--network-caching=50",
-                //"--rtsp-tcp",
-                //"--no-skip-frames",
-                "--no-video-title-show",
-                //"--video-title=0",
-                "--no-osd",
-                //"--no-overlay",
-                "--no-snapshot-preview",
-
-
-                //"--rtsp-timeout=60",
-                //"--rtsp-frame-buffer-size=100000",
-                //"--avcodec-hw=auto",
-                "--avcodec-hw=dxva2",
-                "--clock-synchro=1",
-                "--clock-jitter=0",
-            };
-
-            _libVLC = new LibVLC(libvlcOptions);
-            _mediaPlayer = new MediaPlayer(_libVLC);
-            _mediaPlayer.Mute = true;
-            videoView1.MediaPlayer = _mediaPlayer;
-
-            // Video frame geldiğinde zaman damgasını güncelle
-            _mediaPlayer.TimeChanged += (s, e) =>
-            {
-                _lastVideoUpdateTime = DateTime.Now;
-            };
-
-            _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 2000 };
-            _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
-
-            // Stream sağlık kontrol timer
-            _streamHealthTimer = new System.Windows.Forms.Timer { Interval = 900000 }; // 15 dakikada bir kontrol
-            _streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
-
-            // Veri tabanı yöneticisini başlat
-            _databaseManager = new DatabaseManager();
-            Console.WriteLine("Veri tabanı başlatıldı.");
+                DatabaseManager.Instance.LogSystem("ERROR", "Plaka tanıma formu başlatma hatası", "PlateRecognitionForm.Constructor", ex.ToString());
+            }
         }
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
-            Console.WriteLine($"Media oynatıcısı başlatıldı: {DateTime.Now}");
-            _frameCaptureTimer.Start();
+            try
+            {
+                _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
+                DatabaseManager.Instance.LogSystem("INFO", "Medya oynatıcı başlatıldı", "PlateRecognitionForm.btnStart_Click");
+                _frameCaptureTimer.Start();
 
-            _lastVideoUpdateTime = DateTime.Now;
-            _streamHealthTimer.Start();
+                _lastVideoUpdateTime = DateTime.Now;
+                _streamHealthTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Yayın başlatma hatası", "PlateRecognitionForm.btnStart_Click", ex.ToString());
+            }
         }
 
         private void FrameCaptureTimer_Tick(object sender, EventArgs e)
@@ -130,19 +137,17 @@ namespace WinForms_RTSP_Player
                         // Erişim logunu kaydet
                         _databaseManager.LogAccess(correctedPlate, plateOwner, "IN", isAuthorized, plateResult.Confidence);
                         
-                        
-                        Console.WriteLine($"*******************{DateTime.Now}****************************");
-                        Console.WriteLine($"OCR okunan: {result}");
-                        Console.WriteLine($"-----");
-                        Console.WriteLine($"Düzeltilmiş Plaka: {correctedPlate}");
-                        Console.WriteLine($"Araç Sahibi: {plateOwner}");
-                        Console.WriteLine($"Yetki Durumu: {status}");
+                        // Detaylı loglama (Debug amaçlı konsol yerine INFO log)
+                        // Çok sık log oluşabileceği için burayı sadece access log yeterli olabilir ama debugging için konsol yerine log istenmiş.
+                        // Ancak sürekli her frame için log basmak DB'yi şişirebilir. Sadece tanıma olduğunda AccessLog yetiyor.
+                        // Konsol çıktılarını kaldırdık veya çok gerekliyse debug level (ama user level istemedi).
                         
                         // Eğer izinliyse kapıyı aç (bu kısmı daha sonra ekleyeceğiz)
                         if (isAuthorized)
                         {
-                            Console.WriteLine("🚪 Kapı açılıyor...");
+                            // Console.WriteLine("🚪 Kapı açılıyor...");
                             // TODO: Kapı açma kodu buraya gelecek
+                            DatabaseManager.Instance.LogSystem("INFO", $"Kapı açma tetiklendi: {correctedPlate}", "PlateRecognitionForm.FrameCaptureTimer_Tick");
                         }
                     }
                     else
@@ -151,77 +156,117 @@ namespace WinForms_RTSP_Player
                         lblResult.ForeColor = Color.Silver;
                         lblStatus.Text = "Sistem Durumu: Bekleniyor...";
                         lblStatus.ForeColor = Color.Silver;
-                        Console.WriteLine("🎯 Plaka okunamadı veya geçersiz.");
                     }
                     
                     File.Delete(tempPath);
                 }
-                else Console.WriteLine("🎯 Ekran görüntüsü alınamadı veya dosya bulunamadı.");
+                else 
+                {
+                    // Console.WriteLine("🎯 Ekran görüntüsü alınamadı veya dosya bulunamadı.");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Hata: " + ex.Message);
+                DatabaseManager.Instance.LogSystem("ERROR", "OCR işlem hatası", "PlateRecognitionForm.FrameCaptureTimer_Tick", ex.ToString());
             }
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            _frameCaptureTimer.Stop();
-            _frameCaptureTimer.Dispose();
+            try
+            {
+                _frameCaptureTimer.Stop();
+                _frameCaptureTimer.Dispose();
 
-            _streamHealthTimer.Stop();
-            _streamHealthTimer.Dispose();
+                _streamHealthTimer.Stop();
+                _streamHealthTimer.Dispose();
 
-            _mediaPlayer.Stop();
-            _mediaPlayer.Dispose();
-            _libVLC.Dispose();
+                _mediaPlayer.Stop();
+                _mediaPlayer.Dispose();
+                _libVLC.Dispose();
+                DatabaseManager.Instance.LogSystem("INFO", "Plaka tanıma ekranı kapatıldı", "PlateRecognitionForm.MainForm_FormClosing");
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Form kapatma hatası", "PlateRecognitionForm.MainForm_FormClosing", ex.ToString());
+            }
         }
 
         private void btnTest_Click(object sender, EventArgs e)
         {
-            var testForm = new TestForm();
-            testForm.Show();
+            try
+            {
+                var testForm = new TestForm();
+                testForm.Show();
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Test formu açma hatası", "PlateRecognitionForm.btnTest_Click", ex.ToString());
+            }
         }
 
         private void CheckStreamHealth()
         {
-            var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
-
-            if (secondsSinceLastFrame > 3) // 3 saniye boyunca yeni frame gelmediyse
+            try
             {
-                Console.WriteLine($"⚠ Frame akışı {secondsSinceLastFrame:F1} sn durdu. RTSP yeniden başlatılıyor...{DateTime.Now}");
-                try
+                var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
+
+                if (secondsSinceLastFrame > 3) // 3 saniye boyunca yeni frame gelmediyse
                 {
-                    _mediaPlayer.Stop();
-                    _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
-                    Console.WriteLine($"Media oynatıcısı başlatıldı: {DateTime.Now}");
-                    _lastVideoUpdateTime = DateTime.Now;
+                    DatabaseManager.Instance.LogSystem("WARNING", $"Frame akışı {secondsSinceLastFrame:F1} sn durdu. RTSP yeniden başlatılıyor...", "PlateRecognitionForm.CheckStreamHealth");
+                    try
+                    {
+                        _mediaPlayer.Stop();
+                        _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
+                        DatabaseManager.Instance.LogSystem("INFO", "Medya oynatıcısı yeniden başlatıldı", "PlateRecognitionForm.CheckStreamHealth");
+                        _lastVideoUpdateTime = DateTime.Now;
+                    }
+                    catch (Exception ex)
+                    {
+                        DatabaseManager.Instance.LogSystem("ERROR", "Yeniden bağlantı hatası", "PlateRecognitionForm.CheckStreamHealth", ex.ToString());
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("🎯 Yeniden bağlantı hatası: " + ex.Message);
-                }
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Sağlık kontrolü hatası", "PlateRecognitionForm.CheckStreamHealth", ex.ToString());
             }
         }
 
         private void UpdateStatus(string status, string plate = null)
         {
-            if (InvokeRequired)
+            try
             {
-                Invoke(new Action(() => UpdateStatus(status, plate)));
-                return;
-            }
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() => UpdateStatus(status, plate)));
+                    return;
+                }
 
-            lblStatus.Text = $"Sistem Durumu: {status}";
-            if (!string.IsNullOrEmpty(plate))
+                lblStatus.Text = $"Sistem Durumu: {status}";
+                if (!string.IsNullOrEmpty(plate))
+                {
+                    lblResult.Text = $"Tespit Edilen Plaka: {plate}";
+                }
+            }
+            catch (Exception ex)
             {
-                lblResult.Text = $"Tespit Edilen Plaka: {plate}";
+               // Loglama burada recursion yaratabilir mi? Basit UI update hatası.
+               // Yine de loglayalım ama dikkatli olalım.
             }
         }
 
         private void btnBack_Click(object sender, EventArgs e)
         {
-            this.Close();
+            try
+            {
+                this.Close();
+                // SplashForm Program.cs üzerinden kontrol edilebilir veya burada manually açılabilir ama genelde Close yeterli.
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Geri dönme hatası", "PlateRecognitionForm.btnBack_Click", ex.ToString());
+            }
         }
     }
 }

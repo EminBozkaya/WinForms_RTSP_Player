@@ -7,6 +7,18 @@ namespace WinForms_RTSP_Player.Data
 {
     public class DatabaseManager
     {
+        private static DatabaseManager _instance;
+        public static DatabaseManager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = new DatabaseManager();
+                }
+                return _instance;
+            }
+        }
         private readonly string _connectionString;
         private readonly string _dbPath;
 
@@ -309,7 +321,7 @@ namespace WinForms_RTSP_Player.Data
             }
         }
 
-        public void LogSystem(string logLevel, string message, string details = "")
+        public void LogSystem(string logLevel, string message, string component = "", string details = "")
         {
             try
             {
@@ -317,13 +329,14 @@ namespace WinForms_RTSP_Player.Data
                 {
                     connection.Open();
                     string query = @"
-                        INSERT INTO SystemLog (LogLevel, Message, Details) 
-                        VALUES (@LogLevel, @Message, @Details)";
+                INSERT INTO SystemLog (LogLevel, Message, LogTime, Component, Details) 
+                VALUES (@LogLevel, @Message, CURRENT_TIMESTAMP, @Component, @Details)";
 
                     using (var command = new SqliteCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@LogLevel", logLevel);
                         command.Parameters.AddWithValue("@Message", message);
+                        command.Parameters.AddWithValue("@Component", component);
                         command.Parameters.AddWithValue("@Details", details);
                         command.ExecuteNonQuery();
                     }

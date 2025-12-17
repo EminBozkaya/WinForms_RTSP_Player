@@ -26,6 +26,7 @@ namespace WinForms_RTSP_Player
         private void BtnPlateRecognition_Click(object sender, EventArgs e)
         {
             var plateRecognitionForm = new PlateRecognitionForm();
+            plateRecognitionForm.FormClosed += (s, args) => this.Show();
             plateRecognitionForm.Show();
             this.Hide();
         }

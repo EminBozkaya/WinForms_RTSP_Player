@@ -218,5 +218,10 @@ namespace WinForms_RTSP_Player
                 lblResult.Text = $"Tespit Edilen Plaka: {plate}";
             }
         }
+
+        private void btnBack_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
     }
 }

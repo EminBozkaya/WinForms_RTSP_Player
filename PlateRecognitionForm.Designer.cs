@@ -13,6 +13,7 @@ namespace WinForms_RTSP_Player
         private System.Windows.Forms.Panel panelStatus;
         private System.Windows.Forms.Label lblResult;
         private System.Windows.Forms.Button btnSelectFolder;
+        private System.Windows.Forms.Button btnBack;
 
         protected override void Dispose(bool disposing)
         {
@@ -28,11 +29,12 @@ namespace WinForms_RTSP_Player
             btnTest = new Button();
             panelVideo = new Panel();
             panelControls = new Panel();
+            lblStatus = new Label();
             lblResult = new Label();
             btnSelectFolder = new Button();
+            btnBack = new Button();
             lblTitle = new Label();
             panelStatus = new Panel();
-            lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)videoView1).BeginInit();
             panelVideo.SuspendLayout();
             panelControls.SuspendLayout();
@@ -104,6 +106,15 @@ namespace WinForms_RTSP_Player
             panelControls.Size = new Size(1120, 66);
             panelControls.TabIndex = 1;
             // 
+            // lblStatus
+            // 
+            lblStatus.AutoSize = true;
+            lblStatus.Location = new Point(532, 5);
+            lblStatus.Name = "lblStatus";
+            lblStatus.Size = new Size(89, 15);
+            lblStatus.TabIndex = 3;
+            lblStatus.Text = "Sistem Durumu";
+            // 
             // lblResult
             // 
             lblResult.AutoSize = true;
@@ -132,6 +143,22 @@ namespace WinForms_RTSP_Player
             btnSelectFolder.UseVisualStyleBackColor = false;
             btnSelectFolder.Click += btnStart_Click;
             // 
+            // btnBack
+            // 
+            btnBack.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnBack.BackColor = Color.FromArgb(64, 64, 64);
+            btnBack.FlatAppearance.BorderSize = 0;
+            btnBack.FlatStyle = FlatStyle.Flat;
+            btnBack.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 162);
+            btnBack.ForeColor = Color.White;
+            btnBack.Location = new Point(934, 12);
+            btnBack.Name = "btnBack";
+            btnBack.Size = new Size(202, 35);
+            btnBack.TabIndex = 4;
+            btnBack.Text = "🏠 Ana Sayfaya Dön";
+            btnBack.UseVisualStyleBackColor = false;
+            btnBack.Click += btnBack_Click;
+            // 
             // lblTitle
             // 
             lblTitle.AutoSize = true;
@@ -151,21 +178,13 @@ namespace WinForms_RTSP_Player
             panelStatus.Size = new Size(200, 100);
             panelStatus.TabIndex = 0;
             // 
-            // lblStatus
-            // 
-            lblStatus.AutoSize = true;
-            lblStatus.Location = new Point(532, 5);
-            lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(89, 15);
-            lblStatus.TabIndex = 3;
-            lblStatus.Text = "Sistem Durumu";
-            // 
             // PlateRecognitionForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(30, 30, 30);
             ClientSize = new Size(1148, 783);
+            Controls.Add(btnBack);
             Controls.Add(lblTitle);
             Controls.Add(panelControls);
             Controls.Add(panelVideo);

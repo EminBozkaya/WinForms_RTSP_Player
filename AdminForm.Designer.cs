@@ -107,7 +107,7 @@
             // btnExit
             // 
             btnExit.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-            btnExit.BackColor = Color.FromArgb(192, 57, 43);
+            btnExit.BackColor = Color.Maroon;
             btnExit.Cursor = Cursors.Hand;
             btnExit.FlatAppearance.BorderSize = 0;
             btnExit.FlatStyle = FlatStyle.Flat;
@@ -116,9 +116,9 @@
             btnExit.Location = new Point(23, 582);
             btnExit.Margin = new Padding(4, 3, 4, 3);
             btnExit.Name = "btnExit";
-            btnExit.Size = new Size(140, 58);
+            btnExit.Size = new Size(163, 58);
             btnExit.TabIndex = 3;
-            btnExit.Text = "Çıkış";
+            btnExit.Text = "Ana Sayfaya Dön";
             btnExit.UseVisualStyleBackColor = false;
             btnExit.Click += btnExit_Click;
             // 

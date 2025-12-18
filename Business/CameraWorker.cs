@@ -32,8 +32,10 @@ namespace WinForms_RTSP_Player.Business
         private System.Windows.Forms.Timer _frameCaptureTimer;
         private System.Windows.Forms.Timer _streamHealthTimer;
         private System.Windows.Forms.Timer _heartbeatTimer;
+        private System.Windows.Forms.Timer _periodicResetTimer;
 
         // State tracking
+        private int _framesSinceLastReset = 0;
         private DateTime _lastVideoUpdateTime;
         private readonly string _rtspUrl;
         private bool _disposed = false;
@@ -101,9 +103,20 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
+                // UI bağlantısını kes (D3D11 hatalarını önlemek için en kritik adım)
+                if (_videoView != null && _videoView.InvokeRequired)
+                {
+                    _videoView.Invoke(new Action(() => { _videoView.MediaPlayer = null; }));
+                }
+                else if (_videoView != null)
+                {
+                    _videoView.MediaPlayer = null;
+                }
+
                 _frameCaptureTimer?.Stop();
                 _streamHealthTimer?.Stop();
                 _heartbeatTimer?.Stop();
+                _periodicResetTimer?.Stop();
 
                 _mediaPlayer?.Stop();
 
@@ -126,7 +139,6 @@ namespace WinForms_RTSP_Player.Business
         {
             var libvlcOptions = new[]
             {
-                
                 // 100ms çok sınır bir değerdir, 300ms yaparak ağdaki anlık dalgalanmaları tolere edin.
                 "--network-caching=300",
                 "--no-video-title-show",
@@ -142,7 +154,6 @@ namespace WinForms_RTSP_Player.Business
                 // Gecikme birikmesini önlemek için:
                 "--drop-late-frames",
                 "--skip-frames"
-
             };
 
             ////Eski kamera ayarları -silme-:
@@ -159,6 +170,10 @@ namespace WinForms_RTSP_Player.Business
             //    "--drop-late-frames",     // Geç gelen kareleri beklemek yerine atmaya devam etsin ama donmasın
             //    "--skip-frames"           // Kare atlamaya izin ver
             //};
+
+            // Temizlik yap (leak önleme)
+            _mediaPlayer?.Dispose();
+            _libVLC?.Dispose();
 
             _libVLC = new LibVLC(libvlcOptions);
             _mediaPlayer = new MediaPlayer(_libVLC);
@@ -183,6 +198,13 @@ namespace WinForms_RTSP_Player.Business
 
         private void InitializeTimers()
         {
+            // Eski timerları temizle
+            _frameCaptureTimer?.Dispose();
+            _streamHealthTimer?.Dispose();
+            _heartbeatTimer?.Dispose();
+            // Not: _periodicResetTimer reset sırasında yenilenir, disposal Start() içinde yapılabilir
+            // Ancak InitializeTimers her Start() çağrıldığında tetiklenir.
+            
             // Frame capture timer (1 saniye)
             _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 1000 };
             _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
@@ -194,13 +216,42 @@ namespace WinForms_RTSP_Player.Business
             _streamHealthTimer.Start();
 
             // Heartbeat timer (5 dakika) - Akıllı heartbeat
-            _heartbeatTimer = new System.Windows.Forms.Timer { Interval = 300000 };
-            _heartbeatTimer.Tick += (s, e) => LogHeartbeat();
+            if (_heartbeatTimer != null) _heartbeatTimer.Dispose();
+            _heartbeatTimer = new System.Windows.Forms.Timer();
+            _heartbeatTimer.Interval = 300000; // 5 dakika (300.000 ms)
+            _heartbeatTimer.Tick += HeartbeatTimer_Tick;
             _heartbeatTimer.Start();
+
+            // Periyodik Reset Timer (Sadece ilk kez oluşturulur, her Start'ta kontrol edilip başlatılır)
+            if (_periodicResetTimer == null)
+            {
+                _periodicResetTimer = new System.Windows.Forms.Timer();
+                _periodicResetTimer.Interval = 60000; // Test amaçlı 1 dakika (Normalde 600.000 ms / 10 dakika)
+                _periodicResetTimer.Tick += (s, e) => Restart();
+            }
+            
+            if (!_periodicResetTimer.Enabled)
+                _periodicResetTimer.Start();
 
             DatabaseManager.Instance.LogSystem("INFO", 
                 $"Timers başlatıldı: {CameraId}", 
                 $"CameraWorker.{CameraId}.InitializeTimers");
+        }
+
+        public void Restart()
+        {
+            Console.WriteLine($"[RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId} ({DateTime.Now})");
+            
+            DatabaseManager.Instance.LogSystem("INFO", 
+                $"Kamera periyodik olarak resetleniyor (Gecikme önleme)", 
+                $"CameraWorker.{CameraId}.Restart");
+
+            Stop();
+
+            // VLC'nin arka planda kaynakları serbest bırakması için kısa bir bekleme
+            System.Threading.Thread.Sleep(1000); 
+
+            Start();
         }
 
         private async void FrameCaptureTimer_Tick(object sender, EventArgs e)
@@ -210,7 +261,7 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
-                if (!IsRunning || _mediaPlayer == null)
+                if (!IsRunning || _mediaPlayer == null || _mediaPlayer.State != VLCState.Playing)
                     return;
 
                 string tempPath = Path.Combine(
@@ -340,7 +391,7 @@ namespace WinForms_RTSP_Player.Business
             }
         }
 
-        private void LogHeartbeat()
+        private void HeartbeatTimer_Tick(object sender, EventArgs e)
         {
             try
             {
@@ -390,6 +441,7 @@ namespace WinForms_RTSP_Player.Business
                 _frameCaptureTimer?.Dispose();
                 _streamHealthTimer?.Dispose();
                 _heartbeatTimer?.Dispose();
+                _periodicResetTimer?.Dispose();
 
                 _mediaPlayer?.Dispose();
                 _libVLC?.Dispose();

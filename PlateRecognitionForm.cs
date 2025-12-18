@@ -12,10 +12,11 @@ namespace WinForms_RTSP_Player
     {
         // Camera workers
         private CameraWorker _cameraWorkerIN;
-        private CameraWorker _cameraWorkerOUT; // Optional
+        private CameraWorker _cameraWorkerOUT;
 
         // UI management
-        private System.Windows.Forms.Timer _uiResetTimer;
+        private System.Windows.Forms.Timer _uiResetTimerIN;
+        private System.Windows.Forms.Timer _uiResetTimerOUT;
 
         // Database manager
         private DatabaseManager _databaseManager;
@@ -24,8 +25,13 @@ namespace WinForms_RTSP_Player
         {
             try
             {
-                _uiResetTimer = new System.Windows.Forms.Timer();
-                _uiResetTimer.Tick += (s, e) => ResetUI();
+                // IN Timer
+                _uiResetTimerIN = new System.Windows.Forms.Timer();
+                _uiResetTimerIN.Tick += (s, e) => ResetUI("IN");
+
+                // OUT Timer
+                _uiResetTimerOUT = new System.Windows.Forms.Timer();
+                _uiResetTimerOUT.Tick += (s, e) => ResetUI("OUT");
 
                 InitializeComponent();
                 Core.Initialize(@"libvlc\win-x64");
@@ -33,11 +39,11 @@ namespace WinForms_RTSP_Player
                 // Veri tabanı yöneticisini başlat
                 _databaseManager = DatabaseManager.Instance;
 
-                // IN kamerasını başlat (zorunlu)
+                // IN kamerasını başlat (videoViewIN eklendi)
                 string rtspUrlIN = ConfigurationManager.AppSettings["RtspUrl_IN"];
                 if (!string.IsNullOrEmpty(rtspUrlIN))
                 {
-                    _cameraWorkerIN = new CameraWorker("CAM_IN", rtspUrlIN, "IN", videoView1);
+                    _cameraWorkerIN = new CameraWorker("CAM_IN", rtspUrlIN, "IN", videoViewIN);
                     _cameraWorkerIN.PlateDetected += OnPlateDetected;
                     DatabaseManager.Instance.LogSystem("INFO", 
                         "IN kamerası yapılandırıldı", 
@@ -52,11 +58,11 @@ namespace WinForms_RTSP_Player
                     return;
                 }
 
-                // OUT kamerasını başlat (opsiyonel)
+                // OUT kamerasını başlat (videoViewOUT eklendi)
                 string rtspUrlOUT = ConfigurationManager.AppSettings["RtspUrl_OUT"];
                 if (!string.IsNullOrEmpty(rtspUrlOUT))
                 {
-                    _cameraWorkerOUT = new CameraWorker("CAM_OUT", rtspUrlOUT, "OUT", null!);
+                    _cameraWorkerOUT = new CameraWorker("CAM_OUT", rtspUrlOUT, "OUT", videoViewOUT);
                     _cameraWorkerOUT.PlateDetected += OnPlateDetected;
                     DatabaseManager.Instance.LogSystem("INFO", 
                         "OUT kamerası yapılandırıldı", 
@@ -156,27 +162,46 @@ namespace WinForms_RTSP_Player
         // Yardımcı UI metodu (kodun okunabilirliği için)
         private void UpdateUIResult(AccessDecision decision)
         {
-            // Önce çalışan bir temizleme zamanlayıcısı varsa durdur
-            _uiResetTimer.Stop();
+            bool isIN = (decision.Direction == "IN");
+            
+            // İlgili kontrolleri seç
+            Label lblResult = isIN ? lblResultIN : lblResultOUT;
+            Label lblStatus = isIN ? lblStatusIN : lblStatusOUT;
+            System.Windows.Forms.Timer timer = isIN ? _uiResetTimerIN : _uiResetTimerOUT;
 
-            lblResult.Text = $"Tespit Edilen Plaka: {decision.Plate} ({decision.Direction})";
+            // Önce çalışan bir temizleme zamanlayıcısı varsa durdur
+            timer.Stop();
+
+            lblResult.Text = $"Tespit Edilen Plaka: {decision.Plate}";
             lblResult.ForeColor = decision.IsAuthorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
+            
             lblStatus.Text = decision.IsAuthorized ? "✅ İZİNLİ" : "❌ İZİNSİZ";
             lblStatus.ForeColor = decision.IsAuthorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
 
             // Süre kuralını uygula
             // İzinli ise 45 saniye (45000 ms), İzinsiz ise 10 saniye (10000 ms) sonra temizle
-            _uiResetTimer.Interval = decision.IsAuthorized ? 45000 : 10000;
-            _uiResetTimer.Start();
+            timer.Interval = decision.IsAuthorized ? 45000 : 10000;
+            timer.Start();
         }
 
-        private void ResetUI()
+        private void ResetUI(string direction)
         {
-            _uiResetTimer.Stop();
-            lblResult.Text = "Tespit Edilen Plaka: ---";
-            lblResult.ForeColor = Color.Silver;
-            lblStatus.Text = "Sistem Durumu: Bekleniyor...";
-            lblStatus.ForeColor = Color.Silver;
+            if (direction == "IN")
+            {
+                _uiResetTimerIN.Stop();
+                lblResultIN.Text = "Tespit Edilen Plaka: ---";
+                lblResultIN.ForeColor = Color.Silver;
+                lblStatusIN.Text = "Sistem Durumu: Bekleniyor...";
+                lblStatusIN.ForeColor = Color.Silver;
+            }
+            else
+            {
+                _uiResetTimerOUT.Stop();
+                lblResultOUT.Text = "Tespit Edilen Plaka: ---";
+                lblResultOUT.ForeColor = Color.Silver;
+                lblStatusOUT.Text = "Sistem Durumu: Bekleniyor...";
+                lblStatusOUT.ForeColor = Color.Silver;
+            }
         }
 
 
@@ -220,28 +245,7 @@ namespace WinForms_RTSP_Player
 
 
 
-        private void UpdateStatus(string status, string plate = null)
-        {
-            try
-            {
-                if (InvokeRequired)
-                {
-                    Invoke(new Action(() => UpdateStatus(status, plate)));
-                    return;
-                }
 
-                lblStatus.Text = $"Sistem Durumu: {status}";
-                if (!string.IsNullOrEmpty(plate))
-                {
-                    lblResult.Text = $"Tespit Edilen Plaka: {plate}";
-                }
-            }
-            catch (Exception ex)
-            {
-               // Loglama burada recursion yaratabilir mi? Basit UI update hatası.
-               // Yine de loglayalım ama dikkatli olalım.
-            }
-        }
 
         private void btnBack_Click(object sender, EventArgs e)
         {

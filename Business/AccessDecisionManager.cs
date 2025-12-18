@@ -16,14 +16,13 @@ namespace WinForms_RTSP_Player.Business
 
         private readonly object _lockObject = new object();
 
-        // IN yönü için state tracking
-        private string _lastProcessedPlateIN = "";
-        private DateTime _lastGateTriggerTimeIN = DateTime.MinValue;
-        private bool _gateOpenedByAuthorizedPlateIN = false;
+        // Global Gate Lock state
+        private bool _isGateLockActiveGlobal = false;
+        private DateTime _lastGateTriggerTimeGlobal = DateTime.MinValue;
 
-        // OUT yönü için state tracking
+        // Last processed plates for same-plate deduplication (direction-aware)
+        private string _lastProcessedPlateIN = "";
         private string _lastProcessedPlateOUT = "";
-        private DateTime _lastGateTriggerTimeOUT = DateTime.MinValue;
 
         // Unauthorized cooldown tracking (direction-aware)
         private string _lastUnauthorizedPlateIN = "";
@@ -78,7 +77,23 @@ namespace WinForms_RTSP_Player.Business
                         };
                     }
 
-                    // 4. Cross-direction duplicate check
+                    // 4. Global Gate Lock kontrolü
+                    // Eğer kapı zaten açıksa (herhangi bir yönden), hiçbir işlem yapma
+                    if (IsGateLockActiveGlobal())
+                    {
+                        Console.WriteLine($"[GLOBAL LOCK] Kapı zaten açık → IGNORE: {correctedPlate} ({direction})");
+                        return new AccessDecision
+                        {
+                            Plate = correctedPlate,
+                            Direction = direction,
+                            Action = AccessAction.Ignore,
+                            Reason = "Fiziksel kapı zaten açık (Küresel kilit)",
+                            IsAuthorized = isAuthorized,
+                            Confidence = confidence
+                        };
+                    }
+
+                    // 5. Cross-direction duplicate check
                     if (IsCrossDirectionDuplicate(correctedPlate, direction))
                     {
                         double secondsSinceLastGlobal = (DateTime.Now - _lastProcessedTimeGlobal).TotalSeconds;
@@ -97,7 +112,7 @@ namespace WinForms_RTSP_Player.Business
                         };
                     }
 
-                    // 5. Direction-specific logic
+                    // 6. Direction-specific logic
                     if (direction == "IN")
                     {
                         return ProcessINDirection(correctedPlate, isAuthorized, confidence);
@@ -144,53 +159,17 @@ namespace WinForms_RTSP_Player.Business
 
         private AccessDecision ProcessINDirection(string plate, bool isAuthorized, double confidence)
         {
-            // GATE LOCK kontrolü - Sadece yetkili araç kapıyı açtıysa
-            if (IsGateLockActiveIN())
-            {
-                Console.WriteLine($"GATE LOCK AKTİF (IN) → Plaka göz ardı edildi: {plate}");
-                
-                return new AccessDecision
-                {
-                    Plate = plate,
-                    Direction = "IN",
-                    Action = AccessAction.Ignore,
-                    Reason = "Kapı açık - 45 sn kilidi aktif",
-                    IsAuthorized = isAuthorized,
-                    Confidence = confidence
-                };
-            }
-
-            bool isSameAsLast = (plate == _lastProcessedPlateIN);
-            double secondsSinceLastAction = (DateTime.Now - _lastGateTriggerTimeIN).TotalSeconds;
-
             // YETKİLİ ARAÇ
             if (isAuthorized)
             {
-                if (isSameAsLast && secondsSinceLastAction < GATE_LOCK_SECONDS)
-                {
-                    Console.WriteLine($"Araç İZİNLİ ve AYNI plaka (IN) - 45 sn dolmadı: {plate}");
-                    
-                    return new AccessDecision
-                    {
-                        Plate = plate,
-                        Direction = "IN",
-                        Action = AccessAction.Ignore,
-                        Reason = "Aynı yetkili araç - kapı zaten açık",
-                        IsAuthorized = true,
-                        Confidence = confidence
-                    };
-                }
-
-                // Kapıyı aç
+                // Kapıyı aç (Küresel kilidi aktifleştir)
+                TriggerGateGlobal();
                 _lastProcessedPlateIN = plate;
-                _lastGateTriggerTimeIN = DateTime.Now;
-                _gateOpenedByAuthorizedPlateIN = true;
 
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "IN");
 
                 string owner = DatabaseManager.Instance.GetPlateOwner(plate);
-
                 Console.WriteLine($"✅ Kapı Açılıyor (IN): {plate} - {owner} - {DateTime.Now}");
 
                 return new AccessDecision
@@ -209,7 +188,8 @@ namespace WinForms_RTSP_Player.Business
             {
                 if (IsUnauthorizedCooldownActiveIN(plate))
                 {
-                    Console.WriteLine($"Kayıtsız AYNI Araç (IN) → 60 sn cooldown aktif: {plate}");
+                    double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
+                    Console.WriteLine($"Kayıtsız AYNI Araç (IN) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
                     
                     return new AccessDecision
                     {
@@ -247,36 +227,17 @@ namespace WinForms_RTSP_Player.Business
 
         private AccessDecision ProcessOUTDirection(string plate, bool isAuthorized, double confidence)
         {
-            bool isSameAsLast = (plate == _lastProcessedPlateOUT);
-            double secondsSinceLastAction = (DateTime.Now - _lastGateTriggerTimeOUT).TotalSeconds;
-
             // YETKİLİ ARAÇ
             if (isAuthorized)
             {
-                if (isSameAsLast && secondsSinceLastAction < GATE_LOCK_SECONDS)
-                {
-                    Console.WriteLine($"Araç İZİNLİ ve AYNI plaka (OUT) - 45 sn dolmadı: {plate}");
-                    
-                    return new AccessDecision
-                    {
-                        Plate = plate,
-                        Direction = "OUT",
-                        Action = AccessAction.Ignore,
-                        Reason = "Aynı yetkili araç - kapı zaten açık",
-                        IsAuthorized = true,
-                        Confidence = confidence
-                    };
-                }
-
-                // Kapıyı aç
+                // Kapıyı aç (Küresel kilidi aktifleştir)
+                TriggerGateGlobal();
                 _lastProcessedPlateOUT = plate;
-                _lastGateTriggerTimeOUT = DateTime.Now;
 
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "OUT");
 
                 string owner = DatabaseManager.Instance.GetPlateOwner(plate);
-
                 Console.WriteLine($"✅ Kapı Açılıyor (OUT): {plate} - {owner} - {DateTime.Now}");
 
                 return new AccessDecision
@@ -295,8 +256,9 @@ namespace WinForms_RTSP_Player.Business
             {
                 if (IsUnauthorizedCooldownActiveOUT(plate))
                 {
-                    Console.WriteLine($"Kayıtsız AYNI Araç (OUT) → 60 sn cooldown aktif: {plate}");
-                    
+                    double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
+                    Console.WriteLine($"Kayıtsız AYNI Araç (OUT) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+
                     return new AccessDecision
                     {
                         Plate = plate,
@@ -331,20 +293,26 @@ namespace WinForms_RTSP_Player.Business
             }
         }
 
-        private bool IsGateLockActiveIN()
+        private bool IsGateLockActiveGlobal()
         {
-            if (!_gateOpenedByAuthorizedPlateIN)
+            if (!_isGateLockActiveGlobal)
                 return false;
 
-            double secondsSinceGateOpened = (DateTime.Now - _lastGateTriggerTimeIN).TotalSeconds;
+            double secondsSinceGateOpened = (DateTime.Now - _lastGateTriggerTimeGlobal).TotalSeconds;
 
             if (secondsSinceGateOpened >= GATE_LOCK_SECONDS)
             {
-                _gateOpenedByAuthorizedPlateIN = false;
+                _isGateLockActiveGlobal = false;
                 return false;
             }
 
             return true;
+        }
+
+        private void TriggerGateGlobal()
+        {
+            _isGateLockActiveGlobal = true;
+            _lastGateTriggerTimeGlobal = DateTime.Now;
         }
 
         private bool IsUnauthorizedCooldownActiveIN(string plate)

@@ -79,6 +79,18 @@ namespace WinForms_RTSP_Player.Business
 
                 IsRunning = true;
 
+                // Plaka okuma timer'ını 3 saniye gecikmeli başlat (Isınma süresi - Hataları önlemek için)
+                Task.Delay(3000).ContinueWith(t => {
+                    if (IsRunning && _frameCaptureTimer != null && _videoView != null) {
+                        _videoView.BeginInvoke(new Action(() => {
+                            if (_frameCaptureTimer != null) {
+                                _frameCaptureTimer.Start();
+                                Console.WriteLine($"[INFO] Kamera ısınma süresi tamamlandı. Plaka okuma aktif: {CameraId}");
+                            }
+                        }));
+                    }
+                });
+
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"Kamera başlatıldı: {CameraId} ({Direction}) - {_rtspUrl}", 
                     $"CameraWorker.{CameraId}.Start");
@@ -119,6 +131,12 @@ namespace WinForms_RTSP_Player.Business
                 _periodicResetTimer?.Stop();
 
                 _mediaPlayer?.Stop();
+                
+                // Kaynakları tamamen temizle (Memory leak ve D3D11 çakışmalarını önlemek için)
+                _mediaPlayer?.Dispose();
+                _libVLC?.Dispose();
+                _mediaPlayer = null;
+                _libVLC = null;
 
                 IsRunning = false;
 
@@ -205,10 +223,10 @@ namespace WinForms_RTSP_Player.Business
             // Not: _periodicResetTimer reset sırasında yenilenir, disposal Start() içinde yapılabilir
             // Ancak InitializeTimers her Start() çağrıldığında tetiklenir.
             
-            // Frame capture timer (1 saniye)
+            // Frame capture timer (1 saniye) - Hemen başlatmıyoruz, 3 sn ısınma süresi vereceğiz
             _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 1000 };
             _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
-            _frameCaptureTimer.Start();
+            // _frameCaptureTimer.Start(); // Start() metodunda gecikmeli başlatılacak
 
             // Stream health timer (30 saniye) - Daha sık kontrol
             _streamHealthTimer = new System.Windows.Forms.Timer { Interval = 30000 };
@@ -226,7 +244,7 @@ namespace WinForms_RTSP_Player.Business
             if (_periodicResetTimer == null)
             {
                 _periodicResetTimer = new System.Windows.Forms.Timer();
-                _periodicResetTimer.Interval = 60000; // Test amaçlı 1 dakika (Normalde 600.000 ms / 10 dakika)
+                _periodicResetTimer.Interval = 600000; // 10 dakika (600.000 ms)
                 _periodicResetTimer.Tick += (s, e) => Restart();
             }
             
@@ -249,7 +267,7 @@ namespace WinForms_RTSP_Player.Business
             Stop();
 
             // VLC'nin arka planda kaynakları serbest bırakması için kısa bir bekleme
-            System.Threading.Thread.Sleep(1000); 
+            System.Threading.Thread.Sleep(2000); 
 
             Start();
         }
@@ -261,8 +279,14 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
-                if (!IsRunning || _mediaPlayer == null || _mediaPlayer.State != VLCState.Playing)
+                if (!IsRunning || _mediaPlayer == null)
                     return;
+
+                var state = _mediaPlayer.State;
+                if (state != VLCState.Playing)
+                {
+                    return;
+                }
 
                 string tempPath = Path.Combine(
                     AppDomain.CurrentDomain.BaseDirectory, 
@@ -310,6 +334,10 @@ namespace WinForms_RTSP_Player.Business
                                 File.Delete(tempPath);
                         }
                     });
+                }
+                else
+                {
+                    Console.WriteLine($"[WARNING] Snapshot ALINAMADI: {CameraId} (VLC State: {_mediaPlayer.State})");
                 }
             }
             catch (Exception ex)

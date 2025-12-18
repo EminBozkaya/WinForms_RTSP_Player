@@ -173,5 +173,18 @@ namespace WinForms_RTSP_Player
 
             return prompt.ShowDialog() == DialogResult.OK ? textBox.Text : null;
         }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                LoadSystemLogs();
+                DatabaseManager.Instance.LogSystem("INFO", "Sistem kayıtları yenilendi", "SystemLogs.btnRefresh_Click");
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Sistem kayıtları yenileme hatası", "SystemLogs.btnRefresh_Click", ex.ToString());
+            }
+        }
     }
 }

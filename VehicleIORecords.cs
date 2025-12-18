@@ -208,5 +208,18 @@ namespace WinForms_RTSP_Player
 
             return prompt.ShowDialog() == DialogResult.OK ? textBox.Text : null;
         }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                LoadAccessLogs();
+                DatabaseManager.Instance.LogSystem("INFO", "Araç giriş/çıkış kayıtları yenilendi", "VehicleIORecords.btnRefresh_Click");
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Giriş/çıkış kayıtları yenileme hatası", "VehicleIORecords.btnRefresh_Click", ex.ToString());
+            }
+        }
     }
 }

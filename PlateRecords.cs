@@ -21,6 +21,7 @@ namespace WinForms_RTSP_Player
                 // Add spacing between buttons manually if Dock doesn't handle margin perfectly in some versions
                 btnEdit.Top = btnAdd.Bottom + 10;
                 btnDelete.Top = btnEdit.Bottom + 10;
+                btnRefresh.Top = btnDelete.Bottom + 10;
                 
                 DatabaseManager.Instance.LogSystem("INFO", "Plaka kayıtları ekranı açıldı", "PlateRecords.Constructor");
             }
@@ -163,6 +164,19 @@ namespace WinForms_RTSP_Player
             catch (Exception ex)
             {
                 DatabaseManager.Instance.LogSystem("ERROR", "Plaka silme butonu hatası", "PlateRecords.btnDelete_Click", ex.ToString());
+            }
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                LoadPlates();
+                DatabaseManager.Instance.LogSystem("INFO", "Plaka kayıtları yenilendi", "PlateRecords.btnRefresh_Click");
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Plaka kayıtları yenileme hatası", "PlateRecords.btnRefresh_Click", ex.ToString());
             }
         }
     }

@@ -155,7 +155,7 @@ namespace WinForms_RTSP_Player
             btnBack.Name = "btnBack";
             btnBack.Size = new Size(202, 35);
             btnBack.TabIndex = 4;
-            btnBack.Text = "🏠 Ana Sayfaya Dön";
+            btnBack.Text = "🏠 Ana Sayfayı Aç";
             btnBack.UseVisualStyleBackColor = false;
             btnBack.Click += btnBack_Click;
             // 

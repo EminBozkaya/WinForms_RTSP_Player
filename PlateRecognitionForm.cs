@@ -26,10 +26,26 @@ namespace WinForms_RTSP_Player
 
         private DatabaseManager _databaseManager; // Veri tabanı yöneticisi
 
+        private string _lastProcessedPlate = "";
+        private DateTime _lastGateTriggerTime = DateTime.MinValue;
+
+        private System.Windows.Forms.Timer _uiResetTimer;
+        private bool _gateOpenedByAuthorizedPlate = false;
+
+        private string _lastUnauthorizedPlate = "";
+        private DateTime _lastUnauthorizedLogTime = DateTime.MinValue;
+
+        private const int UNAUTHORIZED_COOLDOWN_SECONDS = 60;
+
+
+
         public PlateRecognitionForm()
         {
             try
             {
+                _uiResetTimer = new System.Windows.Forms.Timer();
+                _uiResetTimer.Tick += (s, e) => ResetUI(); // Timer dolunca ResetUI metodunu çalıştır
+
                 InitializeComponent();
                 Core.Initialize(@"libvlc\win-x64");
 
@@ -41,16 +57,41 @@ namespace WinForms_RTSP_Player
                     return;
                 }
 
+
                 var libvlcOptions = new[]
                 {
-                    "--network-caching=50",
+                    // 100ms çok sınır bir değerdir, 300ms yaparak ağdaki anlık dalgalanmaları tolere edin.
+                    "--network-caching=300",
                     "--no-video-title-show",
                     "--no-osd",
                     "--no-snapshot-preview",
-                    "--avcodec-hw=dxva2",
-                    "--clock-synchro=1",
-                    "--clock-jitter=0",
+                    //"--avcodec-hw=dxva2",
+                    "--avcodec-hw=none",
+                    // clock-synchro=1 ve jitter=0 ayarları VLC'yi çok katı olmaya zorlar. 
+                    // Bu da ağdaki 1ms'lik gecikmede bile hata basmasına neden olur.
+                    "--clock-jitter=500",  // Jitter toleransını artırın
+                    "--clock-synchro=0",    // Senkronizasyon kontrolünü VLC'nin esnek yönetimine bırakın
+                    
+                    // Gecikme birikmesini önlemek için:
+                    "--drop-late-frames",
+                    "--skip-frames"
                 };
+
+
+                ////Eski kamera ayarları -silme-:
+                //var libvlcOptions = new[]
+                //{
+                //    "--network-caching=350", // 50ms çok düşük, eski kameralar için 300 - 500 ms yapın
+                //    "--rtsp-tcp",             // UDP paket kaybını önlemek için TCP üzerinden bağlanmaya zorlayın
+                //    "--avcodec-hw=none",      // Eski kameralarda donanım hızlandırma bazen çakışır, önce devre dışı deneyin
+                //    "--no-video-title-show",
+                //    "--no-snapshot-preview",  // Snapshot önizlemesini kapatır
+                //    "--no-osd",
+                //    "--clock-jitter=500",     // Zaman sapmalarını tolere etmesi için artırın
+                //    "--clock-synchro=0",      // Senkronizasyonu biraz gevşetin
+                //    "--drop-late-frames",     // Geç gelen kareleri beklemek yerine atmaya devam etsin ama donmasın
+                //    "--skip-frames"           // Kare atlamaya izin ver
+                //};
 
                 _libVLC = new LibVLC(libvlcOptions);
                 _mediaPlayer = new MediaPlayer(_libVLC);
@@ -63,7 +104,7 @@ namespace WinForms_RTSP_Player
                     _lastVideoUpdateTime = DateTime.Now;
                 };
 
-                _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 2000 };
+                _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 1000 };
                 _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
 
                 // Stream sağlık kontrol timer
@@ -104,79 +145,219 @@ namespace WinForms_RTSP_Player
             }
         }
 
-        private void FrameCaptureTimer_Tick(object sender, EventArgs e)
+        private async void FrameCaptureTimer_Tick(object sender, EventArgs e)
         {
+            // 1. Kural: Timer'ı durdur
+            _frameCaptureTimer.Stop();
+
             try
             {
-                string tempPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp.jpg");
-                bool success = _mediaPlayer.TakeSnapshot(0, tempPath, 0, 0);
-
-                if (success && File.Exists(tempPath))
+                // ---- GATE LOCK WINDOW ----
+                // SADECE yetkili araç kapıyı açtıysa ve 45 sn dolmadıysa
+                if (IsGateLockActive())
                 {
-                    string result = PlateRecognitionHelper.RunOpenALPR(tempPath);
-                    PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
-                    
-                    if (plateResult != null && !string.IsNullOrEmpty(plateResult.Plate) && plateResult.Plate != "Plaka geçersiz veya okunamadı.")
-                    {
-                        // Plakayı düzelt (Türk formatına uygun hale getir)
-                        string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plateResult.Plate);
-                        
-                        // Veri tabanında kontrol et
-                        string plateOwner = "";
-                        bool isAuthorized = _databaseManager.IsPlateAuthorized(correctedPlate);
-                        
-                        if (isAuthorized)
-                        {
-                             plateOwner = _databaseManager.GetPlateOwner(correctedPlate);
-                        }
-                        
-                        // Sonucu ekranda göster
-                        string status = isAuthorized ? "✅ İZİNLİ" : "❌ İZİNSİZ";
-                        Color statusColor = isAuthorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
-                        
-                        lblResult.Text = $"Tespit Edilen Plaka: {correctedPlate}";
-                        lblResult.ForeColor = statusColor;
-                        
-                        // Durum etiketini güncelle
-                        lblStatus.Text = $"Sistem Durumu: {status}";
-                        lblStatus.ForeColor = statusColor;
-                        
-                        // Erişim logunu kaydet
-                        _databaseManager.LogAccess(correctedPlate, plateOwner, "IN", isAuthorized, plateResult.Confidence);
-                        
-                        // Detaylı loglama (Debug amaçlı konsol yerine INFO log)
-                        // Çok sık log oluşabileceği için burayı sadece access log yeterli olabilir ama debugging için konsol yerine log istenmiş.
-                        // Ancak sürekli her frame için log basmak DB'yi şişirebilir. Sadece tanıma olduğunda AccessLog yetiyor.
-                        // Konsol çıktılarını kaldırdık veya çok gerekliyse debug level (ama user level istemedi).
-                        
-                        // Eğer izinliyse kapıyı aç (bu kısmı daha sonra ekleyeceğiz)
-                        if (isAuthorized)
-                        {
-                            // Console.WriteLine("🚪 Kapı açılıyor...");
-                            // TODO: Kapı açma kodu buraya gelecek
-                            DatabaseManager.Instance.LogSystem("INFO", $"Kapı açma tetiklendi: {correctedPlate}", "PlateRecognitionForm.FrameCaptureTimer_Tick");
-                        }
-                    }
-                    else
-                    {
-                        lblResult.Text = "Tespit Edilen Plaka: ---";
-                        lblResult.ForeColor = Color.Silver;
-                        lblStatus.Text = "Sistem Durumu: Bekleniyor...";
-                        lblStatus.ForeColor = Color.Silver;
-                    }
-                    
-                    File.Delete(tempPath);
+                    Console.WriteLine("GATE LOCK AKTİF → OCR tamamen pas geçildi");
+                    return;
                 }
-                else 
+
+                string tempPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp.jpg");
+
+                if (_mediaPlayer.TakeSnapshot(0, tempPath, 0, 0))
                 {
-                    // Console.WriteLine("🎯 Ekran görüntüsü alınamadı veya dosya bulunamadı.");
+                    await Task.Run(() =>
+                    {
+                        try
+                        {
+                            if (!File.Exists(tempPath)) return;
+
+                            string result = PlateRecognitionHelper.RunOpenALPR(tempPath);
+                            PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
+
+                            if (plateResult != null &&
+                                !string.IsNullOrEmpty(plateResult.Plate) &&
+                                plateResult.Plate.Length >= 7)
+                            {
+                                string correctedPlate =
+                                    PlateSanitizer.ValidateTurkishPlateFormat(plateResult.Plate);
+
+                                bool isAuthorized =
+                                    _databaseManager.IsPlateAuthorized(correctedPlate);
+
+                                float confidenceThreshold = isAuthorized ? 70f : 75f;
+
+                                Console.WriteLine(
+                                    plateResult.Plate + " --- " + plateResult.Confidence
+                                );
+
+                                if (plateResult.Confidence >= confidenceThreshold)
+                                {
+                                    bool isSameAsLast =
+                                        (correctedPlate == _lastProcessedPlate);
+
+                                    double secondsSinceLastAction =
+                                        (DateTime.Now - _lastGateTriggerTime).TotalSeconds;
+
+                                    // -------- YETKİLİ ARAÇ --------
+                                    if (isAuthorized)
+                                    {
+                                        if (isSameAsLast && secondsSinceLastAction < 45)
+                                        {
+                                            Console.WriteLine(
+                                                "araç İZİNLİ ve AYNI plaka 45 saniye dolmadı kapı zaten açık"
+                                            );
+                                            return;
+                                        }
+                                    }
+                                    // -------- İZİNSİZ ARAÇ --------
+                                    else
+                                    {
+                                        if (IsUnauthorizedCooldownActive(correctedPlate))
+                                        {
+                                            Console.WriteLine(
+                                                "Kayıtsız AYNI Araç → 60 sn cooldown aktif, LOG ATLANIYOR     " +
+                                                correctedPlate
+                                            );
+                                            return;
+                                        }
+
+                                        Console.WriteLine(
+                                            "Kayıtsız YENİ Araç LOG ATILIYOR     " +
+                                            correctedPlate
+                                        );
+
+                                        _databaseManager.LogAccess(
+                                            correctedPlate,
+                                            "Yabancı/Tanımsız",
+                                            "IN",
+                                            false,
+                                            plateResult.Confidence
+                                        );
+
+                                        // ---- UNAUTHORIZED COOLDOWN STATE ----
+                                        _lastUnauthorizedPlate = correctedPlate;
+                                        _lastUnauthorizedLogTime = DateTime.Now;
+                                    }
+
+                                    // --- UI Güncelle ---
+                                    this.BeginInvoke(new Action(() =>
+                                    {
+                                        UpdateUIResult(correctedPlate, isAuthorized);
+                                    }));
+
+                                    // ---- ORTAK TAKİP ----
+                                    _lastProcessedPlate = correctedPlate;
+
+                                    // ---- SADECE YETKİLİ ARAÇ KAPI AÇAR ----
+                                    if (isAuthorized)
+                                    {
+                                        _lastGateTriggerTime = DateTime.Now;
+                                        _gateOpenedByAuthorizedPlate = true;
+
+                                        Console.WriteLine(
+                                            "Kapı Açılıyooooooooooooooooooooor       --------" +
+                                            correctedPlate + "  --- " + DateTime.Now
+                                        );
+
+                                        string plateOwner =
+                                            _databaseManager.GetPlateOwner(correctedPlate);
+
+                                        _databaseManager.LogAccess(
+                                            correctedPlate,
+                                            plateOwner,
+                                            "IN",
+                                            true,
+                                            plateResult.Confidence
+                                        );
+
+                                        DatabaseManager.Instance.LogSystem(
+                                            "INFO",
+                                            $"Giriş İzni Verildi: {correctedPlate}",
+                                            "Gate_Open"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            if (File.Exists(tempPath))
+                                File.Delete(tempPath);
+                        }
+                    });
                 }
             }
             catch (Exception ex)
             {
-                DatabaseManager.Instance.LogSystem("ERROR", "OCR işlem hatası", "PlateRecognitionForm.FrameCaptureTimer_Tick", ex.ToString());
+                DatabaseManager.Instance.LogSystem(
+                    "ERROR",
+                    "OCR hatası",
+                    "FrameCaptureTimer_Tick",
+                    ex.ToString()
+                );
+            }
+            finally
+            {
+                // 2. Kural: Timer'ı tekrar başlat
+                _frameCaptureTimer.Start();
             }
         }
+
+
+
+        // Yardımcı UI metodu (kodun okunabilirliği için)
+        private void UpdateUIResult(string plate, bool authorized)
+        {
+            // Önce çalışan bir temizleme zamanlayıcısı varsa durdur
+            _uiResetTimer.Stop();
+
+            lblResult.Text = $"Tespit Edilen Plaka: {plate}";
+            lblResult.ForeColor = authorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
+            lblStatus.Text = authorized ? "✅ İZİNLİ" : "❌ İZİNSİZ";
+            lblStatus.ForeColor = authorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
+
+            // Süre kuralını uygula
+            // İzinli ise 45 saniye (45000 ms), İzinsiz ise 10 saniye (10000 ms) sonra temizle
+            _uiResetTimer.Interval = authorized ? 45000 : 10000;
+            _uiResetTimer.Start();
+        }
+
+        private void ResetUI()
+        {
+            _uiResetTimer.Stop();
+            lblResult.Text = "Tespit Edilen Plaka: ---";
+            lblResult.ForeColor = Color.Silver;
+            lblStatus.Text = "Sistem Durumu: Bekleniyor...";
+            lblStatus.ForeColor = Color.Silver;
+        }
+
+        private bool IsGateLockActive()
+        {
+            if (!_gateOpenedByAuthorizedPlate)
+                return false;
+
+            double secondsSinceGateOpened =
+                (DateTime.Now - _lastGateTriggerTime).TotalSeconds;
+
+            if (secondsSinceGateOpened >= 45)
+            {
+                _gateOpenedByAuthorizedPlate = false;
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsUnauthorizedCooldownActive(string plate)
+        {
+            if (plate != _lastUnauthorizedPlate)
+                return false;
+
+            double seconds =
+                (DateTime.Now - _lastUnauthorizedLogTime).TotalSeconds;
+
+            return seconds < UNAUTHORIZED_COOLDOWN_SECONDS;
+        }
+
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {

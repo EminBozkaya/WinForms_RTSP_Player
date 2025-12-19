@@ -81,7 +81,7 @@ namespace WinForms_RTSP_Player.Business
                     // Eğer kapı zaten açıksa (herhangi bir yönden), hiçbir işlem yapma
                     if (IsGateLockActiveGlobal())
                     {
-                        Console.WriteLine($"[GLOBAL LOCK] Kapı zaten açık → IGNORE: {correctedPlate} ({direction})");
+                        Console.WriteLine($"[{DateTime.Now}] [GLOBAL LOCK] Kapı zaten açık → IGNORE: {correctedPlate} ({direction})");
                         return new AccessDecision
                         {
                             Plate = correctedPlate,
@@ -97,7 +97,7 @@ namespace WinForms_RTSP_Player.Business
                     if (IsCrossDirectionDuplicate(correctedPlate, direction))
                     {
                         double secondsSinceLastGlobal = (DateTime.Now - _lastProcessedTimeGlobal).TotalSeconds;
-                        Console.WriteLine($"⚠️ CROSS-DIRECTION DUPLICATE: {correctedPlate} - " +
+                        Console.WriteLine($"[{DateTime.Now}] ⚠️ CROSS-DIRECTION DUPLICATE: {correctedPlate} - " +
                             $"Son işlem: {_lastProcessedDirectionGlobal} ({secondsSinceLastGlobal:F1}s önce), " +
                             $"Şimdi: {direction} - IGNORE");
 
@@ -189,7 +189,7 @@ namespace WinForms_RTSP_Player.Business
                 if (IsUnauthorizedCooldownActiveIN(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
-                    Console.WriteLine($"Kayıtsız AYNI Araç (IN) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
                     
                     return new AccessDecision
                     {
@@ -210,7 +210,7 @@ namespace WinForms_RTSP_Player.Business
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "IN");
 
-                Console.WriteLine($"❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {plate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {plate}");
 
                 return new AccessDecision
                 {
@@ -257,7 +257,7 @@ namespace WinForms_RTSP_Player.Business
                 if (IsUnauthorizedCooldownActiveOUT(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
-                    Console.WriteLine($"Kayıtsız AYNI Araç (OUT) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
 
                     return new AccessDecision
                     {
@@ -278,7 +278,7 @@ namespace WinForms_RTSP_Player.Business
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "OUT");
 
-                Console.WriteLine($"❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {plate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {plate}");
 
                 return new AccessDecision
                 {

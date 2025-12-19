@@ -105,7 +105,7 @@ namespace WinForms_RTSP_Player.Utilities
                     return SelectBestPlate(allCandidates);
                 }
             }
-            catch (Exception ex) { Console.WriteLine("JSON Parse Hatası: " + ex.Message); }
+            catch (Exception ex) { Console.WriteLine($"[{DateTime.Now}] JSON Parse Hatası: " + ex.Message); }
             return null;
         }
 

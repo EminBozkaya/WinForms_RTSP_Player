@@ -85,7 +85,7 @@ namespace WinForms_RTSP_Player.Business
                         _videoView.BeginInvoke(new Action(() => {
                             if (_frameCaptureTimer != null) {
                                 _frameCaptureTimer.Start();
-                                Console.WriteLine($"[INFO] Kamera ısınma süresi tamamlandı. Plaka okuma aktif: {CameraId}");
+                                Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera ısınma süresi tamamlandı. Plaka okuma aktif: {CameraId}");
                             }
                         }));
                     }
@@ -337,7 +337,7 @@ namespace WinForms_RTSP_Player.Business
                 }
                 else
                 {
-                    Console.WriteLine($"[WARNING] Snapshot ALINAMADI: {CameraId} (VLC State: {_mediaPlayer.State})");
+                    Console.WriteLine($"[{DateTime.Now}] [WARNING] Snapshot ALINAMADI: {CameraId} (VLC State: {_mediaPlayer.State})");
                 }
             }
             catch (Exception ex)

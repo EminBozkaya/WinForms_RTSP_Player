@@ -139,12 +139,15 @@ namespace WinForms_RTSP_Player
                     );
                 }
 
-                // Kapı kontrolü (sadece IN ve Allow için)
-                if (decision.Direction == "IN" && decision.Action == AccessAction.Allow)
+                // Kapı kontrolü (Sadece Allow aksiyonu için log at)
+                if (decision.Action == AccessAction.Allow)
                 {
-                    // TODO: Kapı açma hardware kontrolü buraya eklenecek
+                    string logMessage = decision.Direction == "IN" 
+                        ? $"Giriş İzni Verildi: {decision.Plate}" 
+                        : $"Çıkış İzni Verildi: {decision.Plate}";
+
                     DatabaseManager.Instance.LogSystem("INFO",
-                        $"Giriş İzni Verildi: {decision.Plate}",
+                        logMessage,
                         "Gate_Open");
                 }
             }

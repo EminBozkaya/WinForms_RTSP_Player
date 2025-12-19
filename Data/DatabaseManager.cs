@@ -79,7 +79,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Şema güncelleme hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Şema güncelleme hatası: {ex.Message}");
             }
         }
 
@@ -183,7 +183,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Plaka ekleme hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Plaka ekleme hatası: {ex.Message}");
                 return false;
             }
         }
@@ -216,7 +216,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Plaka güncelleme hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Plaka güncelleme hatası: {ex.Message}");
                 return false;
             }
         }
@@ -240,7 +240,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Plaka silme hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Plaka silme hatası: {ex.Message}");
                 return false;
             }
         }
@@ -264,7 +264,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Plaka kontrol hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Plaka kontrol hatası: {ex.Message}");
                 return false;
             }
         }
@@ -288,7 +288,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Araç sahibi bulma hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Araç sahibi bulma hatası: {ex.Message}");
                 return "";
             }
         }
@@ -317,7 +317,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erişim log hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Erişim log hatası: {ex.Message}");
             }
         }
 
@@ -344,7 +344,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Sistem log hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Sistem log hatası: {ex.Message}");
             }
         }
 
@@ -368,7 +368,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Plaka listesi alma hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Plaka listesi alma hatası: {ex.Message}");
                 return new DataTable();
             }
         }
@@ -393,7 +393,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erişim log listesi alma hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Erişim log listesi alma hatası: {ex.Message}");
                 return new DataTable();
             }
         }
@@ -437,7 +437,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Log silme hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Log silme hatası: {ex.Message}");
                 LogSystem("ERROR", "Log silme başarısız", "DatabaseManager.DeleteAccessLogs", ex.Message);
                 return false;
             }
@@ -463,7 +463,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Sistem log listesi alma hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Sistem log listesi alma hatası: {ex.Message}");
                 return new DataTable();
             }
         }
@@ -507,7 +507,7 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Sistem log silme hatası: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] Sistem log silme hatası: {ex.Message}");
                 return false;
             }
         }

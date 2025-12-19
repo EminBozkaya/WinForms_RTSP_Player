@@ -39,6 +39,8 @@ namespace WinForms_RTSP_Player.Business
         private DateTime _lastVideoUpdateTime;
         private readonly string _rtspUrl;
         private bool _disposed = false;
+        private readonly object _resetLock = new object();
+        private bool _isResetting = false;
 
         public CameraWorker(string cameraId, string rtspUrl, string direction, VideoView videoView = null)
         {
@@ -73,8 +75,8 @@ namespace WinForms_RTSP_Player.Business
                 // Timers başlat
                 InitializeTimers();
 
-                // RTSP stream başlat
-                _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
+                // RTSP stream başlat - Medya bazlı seçeneklerle donanım hızlandırmayı zorla kapat
+                _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
                 _lastVideoUpdateTime = DateTime.Now;
 
                 IsRunning = true;
@@ -140,6 +142,11 @@ namespace WinForms_RTSP_Player.Business
 
                 IsRunning = false;
 
+                // Agresif hafıza temizliği
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"Kamera durduruldu: {CameraId}", 
                     $"CameraWorker.{CameraId}.Stop");
@@ -157,43 +164,50 @@ namespace WinForms_RTSP_Player.Business
         {
             var libvlcOptions = new[]
             {
-                // 100ms çok sınır bir değerdir, 300ms yaparak ağdaki anlık dalgalanmaları tolere edin.
-                "--network-caching=300",
+                // Ağ tamponunu 1 saniyeye çıkar (Daha stabil yayın)
+                "--network-caching=1000",
                 "--no-video-title-show",
                 "--no-osd",
                 "--no-snapshot-preview",
-                //"--avcodec-hw=dxva2",
-                "--avcodec-hw=none",
-                // clock-synchro=1 ve jitter=0 ayarları VLC'yi çok katı olmaya zorlar. 
-                // Bu da ağdaki 1ms'lik gecikmede bile hata basmasına neden olur.
-                "--clock-jitter=500",  // Jitter toleransını artırın
-                "--clock-synchro=0",    // Senkronizasyon kontrolünü VLC'nin esnek yönetimine bırakın
                 
-                // Gecikme birikmesini önlemek için:
+                // GÖRÜNTÜ MOTORUNU DEĞİŞTİR (D3D11 kilitlenmelerini önlemek için kritik)
+                // GDI en temel ve en sessiz motordur, thumbnail hatalarını önler.
+                "--vout=gdi", 
+                
+                // DONANIM HIZLANDIRMAYI KAPAT
+                "--avcodec-hw=none",
+                
+                "--clock-jitter=1000",  // Jitter toleransını artırın
+                "--clock-synchro=0",
+                
                 "--drop-late-frames",
                 "--skip-frames"
+                // "--quiet" ve "--verbose" kaldırıldı ki hata mesajları handler'a ulaşabilsin
             };
-
-            ////Eski kamera ayarları -silme-:
-            //var libvlcOptions = new[]
-            //{
-            //    "--network-caching=350", // 50ms çok düşük, eski kameralar için 300 - 500 ms yapın
-            //    "--rtsp-tcp",             // UDP paket kaybını önlemek için TCP üzerinden bağlanmaya zorlayın
-            //    "--avcodec-hw=none",      // Eski kameralarda donanım hızlandırma bazen çakışır, önce devre dışı deneyin
-            //    "--no-video-title-show",
-            //    "--no-snapshot-preview",  // Snapshot önizlemesini kapatır
-            //    "--no-osd",
-            //    "--clock-jitter=500",     // Zaman sapmalarını tolere etmesi için artırın
-            //    "--clock-synchro=0",      // Senkronizasyonu biraz gevşetin
-            //    "--drop-late-frames",     // Geç gelen kareleri beklemek yerine atmaya devam etsin ama donmasın
-            //    "--skip-frames"           // Kare atlamaya izin ver
-            //};
 
             // Temizlik yap (leak önleme)
             _mediaPlayer?.Dispose();
             _libVLC?.Dispose();
 
             _libVLC = new LibVLC(libvlcOptions);
+            
+            // AKILLI FİLTRE: Sadece gerçekten kritik hataları konsola bas ve veritabanına logla
+            _libVLC.Log += (s, e) => 
+            {
+                // SetThumbNailClip hatası Windows görev çubuğuyla ilgilidir ve zararsızdır, onu ayıkla
+                if (e.Level == LogLevel.Error && !e.Message.Contains("SetThumbNailClip"))
+                {
+                    string logMsg = $"[VLC_ERROR] {e.Message}";
+                    Console.WriteLine($"[{DateTime.Now}] {logMsg}");
+                    
+                    // Önemli: Bu hataları kalıcı olarak veritabanına da kaydet
+                    DatabaseManager.Instance.LogSystem("ERROR", 
+                        $"VLC Kritik Hata: {e.Message}", 
+                        $"CameraWorker.{CameraId}.VLCInternal", 
+                        e.Module);
+                }
+            };
+
             _mediaPlayer = new MediaPlayer(_libVLC);
             _mediaPlayer.Mute = true;
 
@@ -258,18 +272,31 @@ namespace WinForms_RTSP_Player.Business
 
         public void Restart()
         {
-            Console.WriteLine($"[RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId} ({DateTime.Now})");
-            
-            DatabaseManager.Instance.LogSystem("INFO", 
-                $"Kamera periyodik olarak resetleniyor (Gecikme önleme)", 
-                $"CameraWorker.{CameraId}.Restart");
+            lock (_resetLock)
+            {
+                if (_isResetting) return;
+                _isResetting = true;
 
-            Stop();
+                try
+                {
+                    Console.WriteLine($"[{DateTime.Now}] [RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId}");
 
-            // VLC'nin arka planda kaynakları serbest bırakması için kısa bir bekleme
-            System.Threading.Thread.Sleep(2000); 
+                    DatabaseManager.Instance.LogSystem("INFO",
+                        $"Kamera periyodik olarak resetleniyor (Gecikme önleme)",
+                        $"CameraWorker.{CameraId}.Restart");
 
-            Start();
+                    Stop();
+
+                    // VLC'nin arka planda kaynakları serbest bırakması için kısa bir bekleme
+                    System.Threading.Thread.Sleep(3000);
+
+                    Start();
+                }
+                finally
+                {
+                    _isResetting = false;
+                }
+            }
         }
 
         private async void FrameCaptureTimer_Tick(object sender, EventArgs e)
@@ -279,7 +306,7 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
-                if (!IsRunning || _mediaPlayer == null)
+                if (!IsRunning || _mediaPlayer == null || _isResetting)
                     return;
 
                 var state = _mediaPlayer.State;
@@ -403,7 +430,7 @@ namespace WinForms_RTSP_Player.Business
             {
                 _mediaPlayer.Stop();
                 System.Threading.Thread.Sleep(500); // Kısa bir bekleme
-                _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation));
+                _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
                 _lastVideoUpdateTime = DateTime.Now;
 
                 DatabaseManager.Instance.LogSystem("INFO", 

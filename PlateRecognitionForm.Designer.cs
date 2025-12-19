@@ -166,7 +166,7 @@ namespace WinForms_RTSP_Player
             lblCamTitleIN.AutoSize = true;
             lblCamTitleIN.Dock = DockStyle.Top;
             lblCamTitleIN.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            lblCamTitleIN.ForeColor = Color.FromArgb(0, 122, 204);
+            lblCamTitleIN.ForeColor = Color.FromArgb(0, 150, 136);
             lblCamTitleIN.Location = new Point(0, 0);
             lblCamTitleIN.Name = "lblCamTitleIN";
             lblCamTitleIN.Padding = new Padding(10);
@@ -224,7 +224,7 @@ namespace WinForms_RTSP_Player
             lblCamTitleOUT.AutoSize = true;
             lblCamTitleOUT.Dock = DockStyle.Top;
             lblCamTitleOUT.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            lblCamTitleOUT.ForeColor = Color.FromArgb(0, 150, 136);
+            lblCamTitleOUT.ForeColor = Color.FromArgb(150, 130, 35);
             lblCamTitleOUT.Location = new Point(0, 0);
             lblCamTitleOUT.Name = "lblCamTitleOUT";
             lblCamTitleOUT.Padding = new Padding(10);

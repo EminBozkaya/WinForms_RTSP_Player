@@ -79,6 +79,18 @@ namespace WinForms_RTSP_Player.Business
         {
             if (e.CameraId == this.CameraId)
             {
+                // 1. TIMESTAMP DRIFT GUARD
+                // Eğer OCR sonucu çok geç geldiyse (örn: 5 sn), bu bilgi artık bayattır.
+                // Kapı önündeki araç gitmiş olabilir.
+                double latency = (DateTime.Now - e.DetectedAt).TotalSeconds;
+                if (latency > 5.0)
+                {
+                    DatabaseManager.Instance.LogSystem("WARNING", 
+                        $"OCR Sonucu Gecikmeli (Drift: {latency:F1}s) - İŞLENMEDİ: {e.Plate}", 
+                        $"CameraWorker.{CameraId}.OcrWorker_PlateDetected");
+                    return;
+                }
+
                 OnPlateDetected(e);
             }
         }
@@ -117,7 +129,9 @@ namespace WinForms_RTSP_Player.Business
                 if (_frameCaptureTimer != null)
                 {
                     _frameCaptureTimer.Change(3000, Timeout.Infinite); // One-shot başlat (Tick içinde tekrar kurulacak)
+#if DEBUG
                     Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera ısınma süresi (3sn) başladı. {CameraId}");
+#endif
                 }
                 
                 // Diğer timerları başlat
@@ -230,7 +244,9 @@ namespace WinForms_RTSP_Player.Business
                     !e.Message.Contains("computer too slow"))
                 {
                     string logMsg = $"[VLC_ERROR] {e.Message}";
+#if DEBUG
                     Console.WriteLine($"[{DateTime.Now}] {logMsg}");
+#endif
                     
                     DatabaseManager.Instance.LogSystem("ERROR", 
                         $"VLC Kritik Hata: {e.Message}", 
@@ -296,7 +312,9 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] [RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId}");
+#endif
 
                 // Restart sırasında kuyrukta bekleyen eski işleri temizle
                 // Bu sayede eski frame'lerin kapı açmasını engelleriz.

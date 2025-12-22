@@ -60,7 +60,9 @@ namespace WinForms_RTSP_Player.Utilities
             if (!_isInitialized || _serialPort == null || !_serialPort.IsOpen)
             {
                 DatabaseManager.Instance.LogSystem("WARNING", "Kapı açma isteği gönderilemedi: Port hazır değil.", "HardwareController.OpenGateAsync");
+#if DEBUG
                 Console.WriteLine("WARNING!!!!!! Kapı açma isteği gönderilemedi: Port hazır değil.");
+#endif
                 return false;
             }
 
@@ -70,7 +72,9 @@ namespace WinForms_RTSP_Player.Utilities
                 _serialPort.WriteLine("OPEN_GATE");
                 
                 DatabaseManager.Instance.LogSystem("INFO", "Kapı açma komutu gönderildi (OPEN_GATE)", "HardwareController.OpenGateAsync");
+#if DEBUG
                 Console.WriteLine("OPEN_GATE ===>>>>>> Kapı açma komutu gönderildi");
+#endif
 
                 // Geri bildirimi okumayı deneyebiliriz (opsiyonel)
                 // string response = _serialPort.ReadLine();

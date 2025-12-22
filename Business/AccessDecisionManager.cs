@@ -79,7 +79,9 @@ namespace WinForms_RTSP_Player.Business
                     // Eğer kapı zaten açıksa (herhangi bir yönden), hiçbir işlem yapma
                     if (IsGateLockActiveGlobal())
                     {
+#if DEBUG
                         Console.WriteLine($"[{DateTime.Now}] [GLOBAL LOCK] Kapı zaten açık → IGNORE: {correctedPlate} ({direction})");
+#endif
                         return new AccessDecision
                         {
                             Plate = correctedPlate,
@@ -95,9 +97,11 @@ namespace WinForms_RTSP_Player.Business
                     if (IsCrossDirectionDuplicate(correctedPlate, direction))
                     {
                         double secondsSinceLastGlobal = (DateTime.Now - _lastProcessedTimeGlobal).TotalSeconds;
+#if DEBUG
                         Console.WriteLine($"[{DateTime.Now}] ⚠️ CROSS-DIRECTION DUPLICATE: {correctedPlate} - " +
                             $"Son işlem: {_lastProcessedDirectionGlobal} ({secondsSinceLastGlobal:F1}s önce), " +
                             $"Şimdi: {direction} - IGNORE");
+#endif
 
                         return new AccessDecision
                         {
@@ -168,7 +172,12 @@ namespace WinForms_RTSP_Player.Business
                 UpdateGlobalTracking(plate, "IN");
 
                 string owner = DatabaseManager.Instance.GetPlateOwner(plate);
-                Console.WriteLine($"✅ Kapı Açılıyor (IN): {plate} - {owner} - {DateTime.Now}");
+                Guid gateOpId = Guid.NewGuid(); // 2. Gate Trigger Idempotency Token
+
+                // 5. Canonical Log
+#if DEBUG
+                Console.WriteLine($"[PLATE] {plate} | IN | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner}");
+#endif
 
                 return new AccessDecision
                 {
@@ -178,7 +187,8 @@ namespace WinForms_RTSP_Player.Business
                     Reason = "Yetkili araç - giriş izni verildi",
                     IsAuthorized = true,
                     Owner = owner,
-                    Confidence = confidence
+                    Confidence = confidence,
+                    GateOpId = gateOpId
                 };
             }
             // YETKİSİZ ARAÇ
@@ -187,7 +197,9 @@ namespace WinForms_RTSP_Player.Business
                 if (IsUnauthorizedCooldownActiveIN(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
+#if DEBUG
                     Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+#endif
                     
                     return new AccessDecision
                     {
@@ -208,7 +220,9 @@ namespace WinForms_RTSP_Player.Business
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "IN");
 
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {plate}");
+#endif
 
                 return new AccessDecision
                 {
@@ -236,7 +250,12 @@ namespace WinForms_RTSP_Player.Business
                 UpdateGlobalTracking(plate, "OUT");
 
                 string owner = DatabaseManager.Instance.GetPlateOwner(plate);
-                Console.WriteLine($"✅ Kapı Açılıyor (OUT): {plate} - {owner} - {DateTime.Now}");
+                Guid gateOpId = Guid.NewGuid(); // 2. Gate Trigger Idempotency Token
+                
+                // 5. Canonical Log
+#if DEBUG
+                Console.WriteLine($"[PLATE] {plate} | OUT | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner}");
+#endif
 
                 return new AccessDecision
                 {
@@ -246,7 +265,8 @@ namespace WinForms_RTSP_Player.Business
                     Reason = "Yetkili araç - çıkış izni verildi",
                     IsAuthorized = true,
                     Owner = owner,
-                    Confidence = confidence
+                    Confidence = confidence,
+                    GateOpId = gateOpId
                 };
             }
             // YETKİSİZ ARAÇ
@@ -255,7 +275,9 @@ namespace WinForms_RTSP_Player.Business
                 if (IsUnauthorizedCooldownActiveOUT(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
+#if DEBUG
                     Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+#endif
 
                     return new AccessDecision
                     {
@@ -276,7 +298,9 @@ namespace WinForms_RTSP_Player.Business
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "OUT");
 
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {plate}");
+#endif
 
                 return new AccessDecision
                 {
@@ -366,6 +390,7 @@ namespace WinForms_RTSP_Player.Business
         public bool IsAuthorized { get; set; }
         public string Owner { get; set; }
         public double Confidence { get; set; }
+        public Guid? GateOpId { get; set; } // Veritabanı izlenebilirliği için
     }
 
     /// <summary>

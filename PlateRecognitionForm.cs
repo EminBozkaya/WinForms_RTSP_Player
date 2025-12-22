@@ -144,7 +144,8 @@ namespace WinForms_RTSP_Player
                         decision.Owner,
                         decision.Direction,
                         decision.IsAuthorized,
-                        decision.Confidence
+                        decision.Confidence,
+                        $"ID:{decision.GateOpId}"
                     );
                 }
 

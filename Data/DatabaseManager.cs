@@ -79,7 +79,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Şema güncelleme hatası: {ex.Message}");
+#endif
             }
         }
 
@@ -194,7 +196,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Default sistem parametreleri ekleme hatası: {ex.Message}");
+#endif
             }
         }
 
@@ -221,7 +225,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Parametre ekleme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -250,7 +256,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Parametre güncelleme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -277,7 +285,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Sistem parametreleri listeleme hatası: {ex.Message}");
+#endif
                 return new DataTable();
             }
         }
@@ -328,7 +338,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Sistem parametresi okuma hatası ({parameterName}): {ex.Message}");
+#endif
             }
 
             return defaultValue;
@@ -374,7 +386,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Plaka ekleme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -407,7 +421,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Plaka güncelleme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -431,7 +447,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Plaka silme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -455,7 +473,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Plaka kontrol hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -479,12 +499,14 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Araç sahibi bulma hatası: {ex.Message}");
+#endif
                 return "";
             }
         }
 
-        public void LogAccess(string plateNumber, string plateOwner, string accessType, bool isAuthorized, double confidence = 0)
+        public void LogAccess(string plateNumber, string plateOwner, string accessType, bool isAuthorized, double confidence = 0, string notes = "")
         {
             try
             {
@@ -492,8 +514,8 @@ namespace WinForms_RTSP_Player.Data
                 {
                     connection.Open();
                     string query = @"
-                        INSERT INTO AccessLog (PlateNumber, PlateOwner, AccessType, IsAuthorized, Confidence, AccessTime) 
-                        VALUES (@PlateNumber, @PlateOwner, @AccessType, @IsAuthorized, @Confidence, datetime('now', 'localtime'))";
+                        INSERT INTO AccessLog (PlateNumber, PlateOwner, AccessType, IsAuthorized, Confidence, AccessTime, Notes) 
+                        VALUES (@PlateNumber, @PlateOwner, @AccessType, @IsAuthorized, @Confidence, datetime('now', 'localtime'), @Notes)";
 
                     using (var command = new SqliteCommand(query, connection))
                     {
@@ -502,13 +524,16 @@ namespace WinForms_RTSP_Player.Data
                         command.Parameters.AddWithValue("@AccessType", accessType);
                         command.Parameters.AddWithValue("@IsAuthorized", isAuthorized ? 1 : 0);
                         command.Parameters.AddWithValue("@Confidence", confidence);
+                        command.Parameters.AddWithValue("@Notes", notes ?? "");
                         command.ExecuteNonQuery();
                     }
                 }
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Erişim log hatası: {ex.Message}");
+#endif
             }
         }
 
@@ -535,7 +560,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Sistem log hatası: {ex.Message}");
+#endif
             }
         }
 
@@ -559,7 +586,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Plaka listesi alma hatası: {ex.Message}");
+#endif
                 return new DataTable();
             }
         }
@@ -584,7 +613,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Erişim log listesi alma hatası: {ex.Message}");
+#endif
                 return new DataTable();
             }
         }
@@ -628,7 +659,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Log silme hatası: {ex.Message}");
+#endif
                 LogSystem("ERROR", "Log silme başarısız", "DatabaseManager.DeleteAccessLogs", ex.Message);
                 return false;
             }
@@ -654,7 +687,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Sistem log listesi alma hatası: {ex.Message}");
+#endif
                 return new DataTable();
             }
         }
@@ -698,7 +733,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Sistem log silme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -721,7 +758,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Eski erişim kayıtları silme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }
@@ -744,7 +783,9 @@ namespace WinForms_RTSP_Player.Data
             }
             catch (Exception ex)
             {
+#if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] Eski sistem kayıtları silme hatası: {ex.Message}");
+#endif
                 return false;
             }
         }

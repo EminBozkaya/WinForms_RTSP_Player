@@ -19,6 +19,15 @@ namespace WinForms_RTSP_Player
             {
                 InitializeComponent();
                 CenterPanel();
+                
+                // Set custom icons
+                string resourcesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
+                string logIconPath = Path.Combine(resourcesPath, "system_logs_v2_icon.png");
+                string paramIconPath = Path.Combine(resourcesPath, "system_parameters_icon.png");
+
+                if (File.Exists(logIconPath)) btnSystemLogs.Image = ResizeImage(Image.FromFile(logIconPath), 48, 48);
+                if (File.Exists(paramIconPath)) btnSystemParameters.Image = ResizeImage(Image.FromFile(paramIconPath), 48, 48);
+
                 this.Resize += (s, e) => CenterPanel();
                 WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("INFO", "Yönetici paneli açıldı", "AdminForm.Constructor");
             }
@@ -26,6 +35,17 @@ namespace WinForms_RTSP_Player
             {
                 WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Yönetici paneli başlatma hatası", "AdminForm.Constructor", ex.ToString());
             }
+        }
+
+        private Image ResizeImage(Image imgToResize, int width, int height)
+        {
+            Bitmap b = new Bitmap(width, height);
+            using (Graphics g = Graphics.FromImage((Image)b))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(imgToResize, 0, 0, width, height);
+            }
+            return (Image)b;
         }
 
         private void CenterPanel()
@@ -84,6 +104,18 @@ namespace WinForms_RTSP_Player
             catch (Exception ex)
             {
                 WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Sistem kayıtları açma hatası", "AdminForm.btnSystemLogs_Click", ex.ToString());
+            }
+        }
+        
+        private void btnSystemParameters_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                new SystemParametersForm().ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Sistem parametreleri açma hatası", "AdminForm.btnSystemParameters_Click", ex.ToString());
             }
         }
 

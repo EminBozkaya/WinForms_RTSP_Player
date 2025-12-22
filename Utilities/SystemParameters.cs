@@ -9,8 +9,6 @@ namespace WinForms_RTSP_Player.Utilities
     /// </summary>
     public static class SystemParameters
     {
-        private static bool _isLoaded = false;
-
         // Kamera & Akış Ayarları (ms cinsinden kullanılır, DB'de saniye olarak saklanır)
         public static int FrameCaptureTimerInterval { get; private set; } = 1000; //1 sn - Görüntü Yakalama Zaman Aralığı
         public static int StreamHealthTimerInterval { get; private set; } = 30000; //30 sn - Kamera Yayın Görüntü Kontrol Zaman Aralığı
@@ -39,9 +37,6 @@ namespace WinForms_RTSP_Player.Utilities
         /// </summary>
         public static void Load()
         {
-            if (_isLoaded)
-                return;
-
             try
             {
                 var db = DatabaseManager.Instance;
@@ -66,8 +61,6 @@ namespace WinForms_RTSP_Player.Utilities
 
                 AuthorizedConfidenceThreshold = GetFloat(db, "AuthorizedConfidenceThreshold", AuthorizedConfidenceThreshold);
                 UnAuthorizedConfidenceThreshold = GetFloat(db, "UnAuthorizedConfidenceThreshold", UnAuthorizedConfidenceThreshold);
-
-                _isLoaded = true;
             }
             catch (Exception ex)
             {

@@ -22,6 +22,7 @@
             btnPlates = new Button();
             btnEntryExit = new Button();
             btnSystemLogs = new Button();
+            btnSystemParameters = new Button();
             btnExit = new Button();
             centerPanel.SuspendLayout();
             SuspendLayout();
@@ -33,11 +34,12 @@
             centerPanel.Controls.Add(btnPlates);
             centerPanel.Controls.Add(btnEntryExit);
             centerPanel.Controls.Add(btnSystemLogs);
+            centerPanel.Controls.Add(btnSystemParameters);
             centerPanel.FlowDirection = FlowDirection.TopDown;
             centerPanel.Location = new Point(233, 58);
             centerPanel.Margin = new Padding(4, 3, 4, 3);
             centerPanel.Name = "centerPanel";
-            centerPanel.Size = new Size(475, 414);
+            centerPanel.Size = new Size(475, 552);
             centerPanel.TabIndex = 0;
             centerPanel.WrapContents = false;
             // 
@@ -104,6 +106,27 @@
             btnSystemLogs.UseVisualStyleBackColor = false;
             btnSystemLogs.Click += btnSystemLogs_Click;
             // 
+            // btnSystemParameters
+            // 
+            btnSystemParameters.BackColor = Color.FromArgb(60, 65, 75);
+            btnSystemParameters.Cursor = Cursors.Hand;
+            btnSystemParameters.FlatAppearance.BorderSize = 0;
+            btnSystemParameters.FlatStyle = FlatStyle.Flat;
+            btnSystemParameters.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            btnSystemParameters.ForeColor = Color.White;
+            btnSystemParameters.Image = (Image)resources.GetObject("btnSystemParameters.Image");
+            btnSystemParameters.ImageAlign = ContentAlignment.MiddleLeft;
+            btnSystemParameters.Location = new Point(4, 431);
+            btnSystemParameters.Margin = new Padding(4, 17, 4, 17);
+            btnSystemParameters.Name = "btnSystemParameters";
+            btnSystemParameters.Padding = new Padding(29, 0, 0, 0);
+            btnSystemParameters.Size = new Size(467, 104);
+            btnSystemParameters.TabIndex = 4;
+            btnSystemParameters.Text = "  Sistem Parametreleri";
+            btnSystemParameters.TextImageRelation = TextImageRelation.ImageBeforeText;
+            btnSystemParameters.UseVisualStyleBackColor = false;
+            btnSystemParameters.Click += btnSystemParameters_Click;
+            // 
             // btnExit
             // 
             btnExit.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
@@ -146,6 +169,7 @@
         private System.Windows.Forms.Button btnPlates;
         private System.Windows.Forms.Button btnEntryExit;
         private System.Windows.Forms.Button btnSystemLogs;
+        private System.Windows.Forms.Button btnSystemParameters;
         private System.Windows.Forms.Button btnExit;
     }
 }

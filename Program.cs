@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using WinForms_RTSP_Player.Utilities;
 
 namespace WinForms_RTSP_Player
 {
@@ -17,7 +18,10 @@ namespace WinForms_RTSP_Player
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            
+
+            // Sistem parametrelerini uygulama açılışında bir kez yükle
+            SystemParameters.Load();
+
             try 
             {
                 Application.Run(new SplashForm());

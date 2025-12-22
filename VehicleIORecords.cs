@@ -5,6 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Windows.Forms;
 using WinForms_RTSP_Player.Data;
+using WinForms_RTSP_Player.Utilities;
 
 namespace WinForms_RTSP_Player
 {
@@ -39,7 +40,7 @@ namespace WinForms_RTSP_Player
         {
             try
             {
-                DataTable dt = _dbManager.GetAccessLog(1000); // Get last 1000 records
+                DataTable dt = _dbManager.GetAccessLog(SystemParameters.GetAccessLogLimit); // Get last N records from parameters
                 dataGridViewLogs.DataSource = dt;
                 FormatGrid();
             }

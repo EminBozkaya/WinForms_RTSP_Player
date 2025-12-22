@@ -237,20 +237,20 @@ namespace WinForms_RTSP_Player.Business
             // Not: _periodicResetTimer reset sırasında yenilenir, disposal Start() içinde yapılabilir
             // Ancak InitializeTimers her Start() çağrıldığında tetiklenir.
             
-            // Frame capture timer (1 saniye) - Hemen başlatmıyoruz, 3 sn ısınma süresi vereceğiz
-            _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            // Frame capture timer - Hemen başlatmıyoruz, 3 sn ısınma süresi vereceğiz
+            _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = SystemParameters.FrameCaptureTimerInterval };
             _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
             // _frameCaptureTimer.Start(); // Start() metodunda gecikmeli başlatılacak
 
-            // Stream health timer (30 saniye) - Daha sık kontrol
-            _streamHealthTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+            // Stream health timer - Daha sık kontrol
+            _streamHealthTimer = new System.Windows.Forms.Timer { Interval = SystemParameters.StreamHealthTimerInterval };
             _streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
             _streamHealthTimer.Start();
 
-            // Heartbeat timer (5 dakika) - Akıllı heartbeat
+            // Heartbeat timer - Akıllı heartbeat
             if (_heartbeatTimer != null) _heartbeatTimer.Dispose();
             _heartbeatTimer = new System.Windows.Forms.Timer();
-            _heartbeatTimer.Interval = 300000; // 5 dakika (300.000 ms)
+            _heartbeatTimer.Interval = SystemParameters.HeartbeatTimerInterval;
             _heartbeatTimer.Tick += HeartbeatTimer_Tick;
             _heartbeatTimer.Start();
 
@@ -258,7 +258,7 @@ namespace WinForms_RTSP_Player.Business
             if (_periodicResetTimer == null)
             {
                 _periodicResetTimer = new System.Windows.Forms.Timer();
-                _periodicResetTimer.Interval = 600000; // 10 dakika (600.000 ms)
+                _periodicResetTimer.Interval = SystemParameters.PeriodicResetTimerInterval;
                 _periodicResetTimer.Tick += (s, e) => Restart();
             }
             
@@ -335,7 +335,7 @@ namespace WinForms_RTSP_Player.Business
 
                             if (plateResult != null &&
                                 !string.IsNullOrEmpty(plateResult.Plate) &&
-                                plateResult.Plate.Length >= 7)
+                                plateResult.Plate.Length >= SystemParameters.PlateMinimumLength)
                             {
                                 // Event fırlat
                                 OnPlateDetected(new PlateDetectedEventArgs
@@ -406,7 +406,7 @@ namespace WinForms_RTSP_Player.Business
                 // 2. Frame akışı kontrolü
                 var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
 
-                if (secondsSinceLastFrame > 10) // 10 saniye boyunca yeni frame gelmediyse
+                if (secondsSinceLastFrame > SystemParameters.FrameKontrolInterval) // Belirli süre boyunca yeni frame gelmediyse
                 {
                     DatabaseManager.Instance.LogSystem("WARNING", 
                         $"Frame akışı {secondsSinceLastFrame:F1} sn durdu (State: {state}). Yeniden bağlanılıyor: {CameraId}", 
@@ -462,7 +462,7 @@ namespace WinForms_RTSP_Player.Business
                 var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
                 
                 string status = state == VLCState.Playing ? "✅ ÇALIŞIYOR" : $"❌ SORUN ({state})";
-                string frameInfo = secondsSinceLastFrame < 10 ? 
+                string frameInfo = secondsSinceLastFrame < SystemParameters.FrameKontrolInterval ? 
                     $"Frame: {secondsSinceLastFrame:F1}s önce" : 
                     $"⚠️ Frame: {secondsSinceLastFrame:F1}s önce (DONMUŞ)";
 

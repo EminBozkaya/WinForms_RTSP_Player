@@ -35,10 +35,6 @@ namespace WinForms_RTSP_Player.Business
         private string _lastProcessedDirectionGlobal = "";
         private DateTime _lastProcessedTimeGlobal = DateTime.MinValue;
 
-        private const int UNAUTHORIZED_COOLDOWN_SECONDS = 60;
-        private const int GATE_LOCK_SECONDS = 45;
-        private const int CROSS_DIRECTION_COOLDOWN_SECONDS = 45;
-
         private AccessDecisionManager()
         {
             DatabaseManager.Instance.LogSystem("INFO", 
@@ -62,7 +58,9 @@ namespace WinForms_RTSP_Player.Business
                     bool isAuthorized = DatabaseManager.Instance.IsPlateAuthorized(correctedPlate);
 
                     // 3. Confidence threshold (yetkili için daha düşük)
-                    float confidenceThreshold = isAuthorized ? 70f : 75f;
+                    float confidenceThreshold = isAuthorized 
+                        ? SystemParameters.AuthorizedConfidenceThreshold 
+                        : SystemParameters.UnAuthorizedConfidenceThreshold;
 
                     if (confidence < confidenceThreshold)
                     {
@@ -189,7 +187,7 @@ namespace WinForms_RTSP_Player.Business
                 if (IsUnauthorizedCooldownActiveIN(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
                     
                     return new AccessDecision
                     {
@@ -257,7 +255,7 @@ namespace WinForms_RTSP_Player.Business
                 if (IsUnauthorizedCooldownActiveOUT(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
 
                     return new AccessDecision
                     {
@@ -300,7 +298,7 @@ namespace WinForms_RTSP_Player.Business
 
             double secondsSinceGateOpened = (DateTime.Now - _lastGateTriggerTimeGlobal).TotalSeconds;
 
-            if (secondsSinceGateOpened >= GATE_LOCK_SECONDS)
+            if (secondsSinceGateOpened >= SystemParameters.GATE_LOCK_SECONDS)
             {
                 _isGateLockActiveGlobal = false;
                 return false;
@@ -321,7 +319,7 @@ namespace WinForms_RTSP_Player.Business
                 return false;
 
             double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
-            return seconds < UNAUTHORIZED_COOLDOWN_SECONDS;
+            return seconds < SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS;
         }
 
         private bool IsUnauthorizedCooldownActiveOUT(string plate)
@@ -330,7 +328,7 @@ namespace WinForms_RTSP_Player.Business
                 return false;
 
             double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
-            return seconds < UNAUTHORIZED_COOLDOWN_SECONDS;
+            return seconds < SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS;
         }
 
         private bool IsCrossDirectionDuplicate(string plate, string direction)
@@ -343,9 +341,9 @@ namespace WinForms_RTSP_Player.Business
             if (direction == _lastProcessedDirectionGlobal)
                 return false;
 
-            // Farklı direction ve 45 saniye dolmadıysa cross-direction duplicate
+            // Farklı direction ve belirlenen süre dolmadıysa cross-direction duplicate
             double seconds = (DateTime.Now - _lastProcessedTimeGlobal).TotalSeconds;
-            return seconds < CROSS_DIRECTION_COOLDOWN_SECONDS;
+            return seconds < SystemParameters.CROSS_DIRECTION_COOLDOWN_SECONDS;
         }
 
         private void UpdateGlobalTracking(string plate, string direction)

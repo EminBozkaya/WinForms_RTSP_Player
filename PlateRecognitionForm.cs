@@ -182,8 +182,10 @@ namespace WinForms_RTSP_Player
             lblStatus.ForeColor = decision.IsAuthorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
 
             // Süre kuralını uygula
-            // İzinli ise 45 saniye (45000 ms), İzinsiz ise 10 saniye (10000 ms) sonra temizle
-            timer.Interval = decision.IsAuthorized ? 45000 : 10000;
+            // İzinli ise AuthorizedPlateShowTime, İzinsiz ise UnAuthorizedPlateShowTime sonra temizle
+            timer.Interval = decision.IsAuthorized 
+                ? Utilities.SystemParameters.AuthorizedPlateShowTime 
+                : Utilities.SystemParameters.UnAuthorizedPlateShowTime;
             timer.Start();
         }
 

@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using WinForms_RTSP_Player.Business;
 using WinForms_RTSP_Player.Data;
+using WinForms_RTSP_Player.Utilities;
 
 namespace WinForms_RTSP_Player
 {
@@ -78,6 +79,14 @@ namespace WinForms_RTSP_Player
                 DatabaseManager.Instance.LogSystem("INFO", 
                     "Plaka tanıma formu başlatıldı", 
                     "PlateRecognitionForm.Constructor");
+
+                // Donanım kontrolcüsünü başlat
+                string arduinoPort = ConfigurationManager.AppSettings["ArduinoPort"];
+                int baudRate = int.Parse(ConfigurationManager.AppSettings["ArduinoBaudRate"] ?? "9600");
+                if (!string.IsNullOrEmpty(arduinoPort))
+                {
+                    HardwareController.Instance.Initialize(arduinoPort, baudRate);
+                }
             }
             catch (Exception ex)
             {
@@ -139,17 +148,20 @@ namespace WinForms_RTSP_Player
                     );
                 }
 
-                //// Kapı kontrolü (Sadece Allow aksiyonu için log at) => buna gerek yok, LogAccess tablosuna log atılıyor zaten
-                //if (decision.Action == AccessAction.Allow)
-                //{
-                //    string logMessage = decision.Direction == "IN" 
-                //        ? $"Giriş İzni Verildi: {decision.Plate}" 
-                //        : $"Çıkış İzni Verildi: {decision.Plate}";
+                // Kapı kontrolü (Sadece Allow aksiyonu için)
+                if (decision.Action == AccessAction.Allow)
+                {
+                    string logMessage = decision.Direction == "IN" 
+                        ? $"Giriş İzni Verildi: {decision.Plate}" 
+                        : $"Çıkış İzni Verildi: {decision.Plate}";
 
-                //    DatabaseManager.Instance.LogSystem("INFO",
-                //        logMessage,
-                //        "Gate_Open");
-                //}
+                    DatabaseManager.Instance.LogSystem("INFO",
+                        logMessage,
+                        "Gate_Open");
+
+                    // Arduino'ya kapı açma komutu gönder
+                    _ = HardwareController.Instance.OpenGateAsync();
+                }
             }
             catch (Exception ex)
             {

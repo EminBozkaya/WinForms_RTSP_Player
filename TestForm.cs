@@ -33,6 +33,18 @@ namespace WinForms_RTSP_Player
             // Butonları devre dışı bırak
             btnPrevious.Enabled = false;
             btnNext.Enabled = false;
+
+            // Kapı Test Butonu
+            Button btnTestGate = new Button();
+            btnTestGate.Text = "🚪 Kapıyı Test Et";
+            btnTestGate.Size = new Size(150, 40);
+            btnTestGate.Location = new Point(this.Width - 180, this.Height - 100);
+            btnTestGate.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btnTestGate.Click += (s, e) => {
+                _ = HardwareController.Instance.OpenGateAsync();
+                MessageBox.Show("Kapı açma komutu gönderildi.");
+            };
+            this.Controls.Add(btnTestGate);
         }
 
         private void btnSelectFolder_Click(object sender, EventArgs e)

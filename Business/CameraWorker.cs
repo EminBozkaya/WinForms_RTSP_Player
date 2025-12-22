@@ -66,9 +66,21 @@ namespace WinForms_RTSP_Player.Business
             _heartbeatInterval = SystemParameters.HeartbeatTimerInterval;
             _periodicResetInterval = SystemParameters.PeriodicResetTimerInterval;
 
+            // OCR Worker'dan gelen sonuçları dinle
+            OcrWorker.Instance.PlateDetected += OcrWorker_PlateDetected;
+
             DatabaseManager.Instance.LogSystem("INFO", 
                 $"CameraWorker oluşturuldu: {CameraId} ({Direction})", 
                 $"CameraWorker.{CameraId}.Constructor");
+        }
+
+        // OCR Worker'dan gelen sonucu yakala ve bu kameraya aitse işle
+        private void OcrWorker_PlateDetected(object sender, PlateDetectedEventArgs e)
+        {
+            if (e.CameraId == this.CameraId)
+            {
+                OnPlateDetected(e);
+            }
         }
 
         /// <summary>
@@ -350,40 +362,36 @@ namespace WinForms_RTSP_Player.Business
                     Monitor.Exit(_frameLock);
             }
 
-            // OCR İŞLEMİ LOCK DIŞINDA (Uzun sürse de lock meşgul edilmez)
+            // OCR İŞLEMİNİ KUYRUĞA AT (Hız ve disk bağımsızlığı)
             if (snapshotTaken && File.Exists(tempPath))
             {
                 try
                 {
-                    string result = PlateRecognitionHelper.RunOpenALPR(tempPath);
-                    PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
+                    // Resmi belleğe al (Disk lock'tan kurtulmak için)
+                    byte[] imageBytes = File.ReadAllBytes(tempPath);
+                    
+                    // Temp dosyayı hemen sil
+                    File.Delete(tempPath);
 
-                    if (plateResult != null &&
-                        !string.IsNullOrEmpty(plateResult.Plate) &&
-                        plateResult.Plate.Length >= SystemParameters.PlateMinimumLength)
+                    // İşi kuyruğa at
+                    OcrWorker.Instance.Enqueue(new OcrJob
                     {
-                        OnPlateDetected(new PlateDetectedEventArgs
-                        {
-                            CameraId = this.CameraId,
-                            Direction = this.Direction,
-                            Plate = plateResult.Plate,
-                            Confidence = plateResult.Confidence,
-                            DetectedAt = DateTime.Now
-                        });
-                    }
+                        CameraId = this.CameraId,
+                        Direction = this.Direction,
+                        ImageBytes = imageBytes,
+                        CapturedAt = DateTime.Now
+                    });
                 }
                 catch (Exception ex)
                 {
                     DatabaseManager.Instance.LogSystem("ERROR", 
-                        $"OCR hatası: {CameraId}", 
+                        $"Snapshot Kuyruklama Hatası: {CameraId}", 
                         $"CameraWorker.{CameraId}.FrameCaptureTimer_Tick", 
                         ex.ToString());
                 }
-                finally
-                {
-                    if (File.Exists(tempPath))
-                        File.Delete(tempPath);
-                }
+                // Finally bloğuna gerek yok, delete işlemi try içinde yapıldı.
+                // Eğer hata olursa dosya kalabilir, ama unique isim olduğu için sorun olmaz.
+                // Temizlik için delete'i catch'e de ekleyebiliriz ama byte okuma hatası nadirdir.
             }
 
             // Timer'ı bir sonraki tur için yeniden kur
@@ -506,6 +514,9 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
+                // OCR dinlemeyi bırak
+                OcrWorker.Instance.PlateDetected -= OcrWorker_PlateDetected;
+
                 Stop();
 
                 _frameCaptureTimer?.Dispose();

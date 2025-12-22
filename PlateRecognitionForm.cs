@@ -139,17 +139,17 @@ namespace WinForms_RTSP_Player
                     );
                 }
 
-                // Kapı kontrolü (Sadece Allow aksiyonu için log at)
-                if (decision.Action == AccessAction.Allow)
-                {
-                    string logMessage = decision.Direction == "IN" 
-                        ? $"Giriş İzni Verildi: {decision.Plate}" 
-                        : $"Çıkış İzni Verildi: {decision.Plate}";
+                //// Kapı kontrolü (Sadece Allow aksiyonu için log at) => buna gerek yok, LogAccess tablosuna log atılıyor zaten
+                //if (decision.Action == AccessAction.Allow)
+                //{
+                //    string logMessage = decision.Direction == "IN" 
+                //        ? $"Giriş İzni Verildi: {decision.Plate}" 
+                //        : $"Çıkış İzni Verildi: {decision.Plate}";
 
-                    DatabaseManager.Instance.LogSystem("INFO",
-                        logMessage,
-                        "Gate_Open");
-                }
+                //    DatabaseManager.Instance.LogSystem("INFO",
+                //        logMessage,
+                //        "Gate_Open");
+                //}
             }
             catch (Exception ex)
             {
@@ -178,7 +178,7 @@ namespace WinForms_RTSP_Player
             lblResult.Text = $"Tespit Edilen Plaka: {decision.Plate}";
             lblResult.ForeColor = decision.IsAuthorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
             
-            lblStatus.Text = decision.IsAuthorized ? "✅ İZİNLİ" : "❌ İZİNSİZ";
+            lblStatus.Text = decision.IsAuthorized ? "✅ KAYITLI" : "❌ KAYITSIZ";
             lblStatus.ForeColor = decision.IsAuthorized ? Color.FromArgb(0, 200, 83) : Color.FromArgb(244, 67, 54);
 
             // Süre kuralını uygula

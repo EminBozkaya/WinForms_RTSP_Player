@@ -124,6 +124,17 @@ namespace WinForms_RTSP_Player.Data
                         Details TEXT
                     )";
 
+                // Sistem parametreleri tablosu
+                string createSystemParameterTable = @"
+                    CREATE TABLE SystemParameter (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT UNIQUE NOT NULL,
+                        Value TEXT NOT NULL,
+                        Detail TEXT,
+                        CreatedDate DATETIME DEFAULT (datetime('now', 'localtime')),
+                        UpdatedDate DATETIME DEFAULT (datetime('now', 'localtime'))
+                    )";
+
                 using (var command = new SqliteCommand(createPlatesTable, connection))
                 {
                     command.ExecuteNonQuery();
@@ -139,10 +150,162 @@ namespace WinForms_RTSP_Player.Data
                     command.ExecuteNonQuery();
                 }
 
+                using (var command = new SqliteCommand(createSystemParameterTable, connection))
+                {
+                    command.ExecuteNonQuery();
+                }
+
+                // Sistem default parametreleri ekle
+                InsertSystemDefaultParameters();
+
                 // Örnek plaka verileri ekle
                 //InsertSamplePlates();
             }
         }
+
+        private void InsertSystemDefaultParameters()
+        {
+            try
+            {
+                // Standart Parametreler ve değerleri:
+                // Kamera & Akış Ayarları
+                AddSystemParameter("FrameCaptureTimerInterval", "1000", "Görüntü Yakalama Zaman Aralığı (ms)");
+                AddSystemParameter("StreamHealthTimerInterval", "30000", "Kamera Yayın Görüntü Kontrol Zaman Aralığı (ms)");
+                AddSystemParameter("HeartbeatTimerInterval", "300000", "Sistem Sağlığı Kontrol Zaman Aralığı (ms)");
+                AddSystemParameter("PeriodicResetTimerInterval", "600000", "Görüntü Yeniden Başlatma Zaman Aralığı (ms)");
+                AddSystemParameter("PlateMinimumLength", "7", "Minimum Plaka Karakter Sayısı");
+                AddSystemParameter("FrameKontrolInterval", "10", "Kamera Frame Kontrol Zaman Aralığı (saniye)");
+
+                // UI Gösterim Süreleri
+                AddSystemParameter("AuthorizedPlateShowTime", "45000", "Kayıtlı Araç Plaka Gösterim Süresi (ms)");
+                AddSystemParameter("UnAuthorizedPlateShowTime", "10000", "Kayıtsız Araç Plaka Gösterim Süresi (ms)");
+
+                // Kayıt Gösterim Limitleri
+                AddSystemParameter("GetAccessLogLimit", "1000", "Araç Giriş-Çıkış Kayıt Gösterim Limiti (adet)");
+                AddSystemParameter("GetSystemLogLimit", "1000", "Sistem Kayıt Gösterim Limiti (adet)");
+
+                // Erişim Karar Parametreleri
+                AddSystemParameter("UNAUTHORIZED_COOLDOWN_SECONDS", "60", "Kayıtsız Aynı Araç Log Kaydı Bekleme Süresi (saniye)");
+                AddSystemParameter("GATE_LOCK_SECONDS", "45", "Kapı Açılma Bekleme Süresi (saniye)");
+                AddSystemParameter("CROSS_DIRECTION_COOLDOWN_SECONDS", "45", "Aynı Araç Giriş-Çıkış Bekleme Süresi (saniye)");
+                AddSystemParameter("AuthorizedConfidenceThreshold", "70", "Kayıtlı Araç Plaka Okuma Doğruluğu Yüzdelik Eşiği");
+                AddSystemParameter("UnAuthorizedConfidenceThreshold", "75", "Kayıtsız Araç Plaka Okuma Doğruluğu Yüzdelik Eşiği");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] Default sistem parametreleri ekleme hatası: {ex.Message}");
+            }
+        }
+
+        public bool AddSystemParameter(string parameterName, string parameterValue, string parameterDetail)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                        INSERT INTO SystemParameter (Name, Value, Detail, CreatedDate, UpdatedDate) 
+                        VALUES (@Name, @Value, @Detail, datetime('now', 'localtime'), datetime('now', 'localtime'))";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Name", parameterName);
+                        command.Parameters.AddWithValue("@Value", parameterValue);
+                        command.Parameters.AddWithValue("@Detail", parameterDetail);
+                        command.ExecuteNonQuery();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] Parametre ekleme hatası: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool UpdateSystemParameter(int id, string parameterValue)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                        UPDATE SystemParameter 
+                        SET Value = @Value,
+                            UpdatedDate = datetime('now', 'localtime')
+                        WHERE Id = @Id";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", id);
+                        command.Parameters.AddWithValue("@Value", parameterValue);
+                        command.ExecuteNonQuery();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] Parametre güncelleme hatası: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Tek bir sistem parametresini döner. Kayıt yoksa, varsa verilen varsayılan değerle oluşturur.
+        /// </summary>
+        public string GetSystemParameter(string parameterName, string defaultValue = null, string defaultDetail = null)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    // Önce var mı diye bak
+                    string selectQuery = @"SELECT Value FROM SystemParameter WHERE Name = @Name LIMIT 1";
+                    using (var command = new SqliteCommand(selectQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("@Name", parameterName);
+                        var result = command.ExecuteScalar();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            return result.ToString();
+                        }
+                    }
+
+                    // Kayıt yok, default değer verilmişse otomatik oluştur
+                    if (defaultValue != null)
+                    {
+                        string detailToUse = defaultDetail ?? $"Otomatik oluşturulan varsayılan değer ({parameterName})";
+
+                        string insertQuery = @"
+                            INSERT INTO SystemParameter (Name, Value, Detail, CreatedDate, UpdatedDate)
+                            VALUES (@Name, @Value, @Detail, datetime('now', 'localtime'), datetime('now', 'localtime'))";
+
+                        using (var insertCommand = new SqliteCommand(insertQuery, connection))
+                        {
+                            insertCommand.Parameters.AddWithValue("@Name", parameterName);
+                            insertCommand.Parameters.AddWithValue("@Value", defaultValue);
+                            insertCommand.Parameters.AddWithValue("@Detail", detailToUse);
+                            insertCommand.ExecuteNonQuery();
+                        }
+
+                        return defaultValue;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] Sistem parametresi okuma hatası ({parameterName}): {ex.Message}");
+            }
+
+            return defaultValue;
+        }
+
 
         private void InsertSamplePlates()
         {
@@ -373,7 +536,7 @@ namespace WinForms_RTSP_Player.Data
             }
         }
 
-        public DataTable GetAccessLog(int limit = 100)
+        public DataTable GetAccessLog(int limit = 1000)
         {
             try
             {

@@ -159,8 +159,8 @@ namespace WinForms_RTSP_Player.Data
                 // Sistem default parametreleri ekle
                 InsertSystemDefaultParameters();
 
-                // Örnek plaka verileri ekle
-                InsertSamplePlates();
+                //// Örnek plaka verileri ekle
+                //InsertSamplePlates();
             }
         }
 
@@ -699,6 +699,52 @@ namespace WinForms_RTSP_Player.Data
             catch (Exception ex)
             {
                 Console.WriteLine($"[{DateTime.Now}] Sistem log silme hatası: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool DeleteOldAccessLogs(int days)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "DELETE FROM AccessLog WHERE AccessTime < datetime('now', 'localtime', @Days)";
+                    using (var command = new SqliteCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Days", $"-{days} days");
+                        command.ExecuteNonQuery();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] Eski erişim kayıtları silme hatası: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool DeleteOldSystemLogs(int days)
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "DELETE FROM SystemLog WHERE LogTime < datetime('now', 'localtime', @Days)";
+                    using (var command = new SqliteCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Days", $"-{days} days");
+                        command.ExecuteNonQuery();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] Eski sistem kayıtları silme hatası: {ex.Message}");
                 return false;
             }
         }

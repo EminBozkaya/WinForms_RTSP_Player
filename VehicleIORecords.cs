@@ -23,6 +23,7 @@ namespace WinForms_RTSP_Player
                 // Subscribe to CellFormatting event before loading data
                 dataGridViewLogs.CellFormatting += DataGridViewLogs_CellFormatting;
                 
+                InitializeFilters();
                 LoadAccessLogs();
                 
                 // Allow multiple row selection
@@ -220,6 +221,106 @@ namespace WinForms_RTSP_Player
             catch (Exception ex)
             {
                 DatabaseManager.Instance.LogSystem("ERROR", "Giriş/çıkış kayıtları yenileme hatası", "VehicleIORecords.btnRefresh_Click", ex.ToString());
+            }
+        }
+
+        private void btnClearOldData_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Prompt for password
+                string password = PromptForPassword();
+                if (password == null) return;
+
+                // Verify password from User.config
+                string correctPassword = ConfigurationManager.AppSettings["SuperAdminPassword"];
+                if (password != correctPassword)
+                {
+                    MessageBox.Show("Şifreyi yanlış girdiniz.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    DatabaseManager.Instance.LogSystem("WARNING", "Yanlış şifre ile toplu log temizleme denemesi", "VehicleIORecords.btnClearOldData_Click");
+                    return;
+                }
+
+                // Confirm deletion
+                DialogResult result = MessageBox.Show(
+                    "İki haftadan eski tüm giriş/çıkış kayıtları temizlenecek. Bu işlem geri alınamaz. Emin misiniz?",
+                    "Toplu Silme Onayı",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result == DialogResult.Yes)
+                {
+                    if (_dbManager.DeleteOldAccessLogs(14))
+                    {
+                        MessageBox.Show("Eski kayıtlar başarıyla temizlendi.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        DatabaseManager.Instance.LogSystem("INFO", "İki haftadan eski giriş/çıkış kayıtları temizlendi", "VehicleIORecords.btnClearOldData_Click");
+                        LoadAccessLogs(); // Refresh grid
+                    }
+                    else
+                    {
+                        MessageBox.Show("Temizleme işlemi sırasında hata oluştu.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Toplu kayıt temizleme hatası", "VehicleIORecords.btnClearOldData_Click", ex.ToString());
+                MessageBox.Show("Bir hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void InitializeFilters()
+        {
+            cmbTypeFilter.Items.Add("Tümü");
+            cmbTypeFilter.Items.Add("Giriş");
+            cmbTypeFilter.Items.Add("Çıkış");
+            cmbTypeFilter.SelectedIndex = 0;
+
+            cmbAuthFilter.Items.Add("Tümü");
+            cmbAuthFilter.Items.Add("Kayıtlı");
+            cmbAuthFilter.Items.Add("Kayıtsız");
+            cmbAuthFilter.SelectedIndex = 0;
+        }
+
+        private void FilterControl_Changed(object sender, EventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void ApplyFilters()
+        {
+            try
+            {
+                if (dataGridViewLogs.DataSource is DataTable dt)
+                {
+                    List<string> filters = new List<string>();
+
+                    // Plate Filter
+                    if (!string.IsNullOrWhiteSpace(txtSearchPlate.Text))
+                    {
+                        filters.Add($"PlateNumber LIKE '%{txtSearchPlate.Text.Replace("'", "''")}%'");
+                    }
+
+                    // Type Filter (IN/OUT)
+                    if (cmbTypeFilter.SelectedIndex > 0)
+                    {
+                        string type = cmbTypeFilter.SelectedItem.ToString() == "Giriş" ? "IN" : "OUT";
+                        filters.Add($"AccessType = '{type}'");
+                    }
+
+                    // Auth Filter (1/0)
+                    if (cmbAuthFilter.SelectedIndex > 0)
+                    {
+                        int auth = cmbAuthFilter.SelectedItem.ToString() == "Kayıtlı" ? 1 : 0;
+                        filters.Add($"IsAuthorized = {auth}");
+                    }
+
+                    dt.DefaultView.RowFilter = string.Join(" AND ", filters);
+                }
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Filtreleme hatası", "VehicleIORecords.ApplyFilters", ex.ToString());
             }
         }
     }

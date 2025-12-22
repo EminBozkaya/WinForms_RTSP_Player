@@ -18,6 +18,7 @@ namespace WinForms_RTSP_Player
             {
                 InitializeComponent();
                 _dbManager = DatabaseManager.Instance;
+                InitializeFilters();
                 LoadSystemLogs();
                 
                 // Allow multiple row selection
@@ -185,6 +186,94 @@ namespace WinForms_RTSP_Player
             catch (Exception ex)
             {
                 DatabaseManager.Instance.LogSystem("ERROR", "Sistem kayıtları yenileme hatası", "SystemLogs.btnRefresh_Click", ex.ToString());
+            }
+        }
+
+        private void btnClearOldData_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Prompt for password
+                string password = PromptForPassword();
+                if (password == null) return;
+
+                // Verify password from User.config
+                string correctPassword = ConfigurationManager.AppSettings["SuperAdminPassword"];
+                if (password != correctPassword)
+                {
+                    MessageBox.Show("Şifreyi yanlış girdiniz.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    DatabaseManager.Instance.LogSystem("WARNING", "Yanlış şifre ile toplu sistem log temizleme denemesi", "SystemLogs.btnClearOldData_Click");
+                    return;
+                }
+
+                // Confirm deletion
+                DialogResult result = MessageBox.Show(
+                    "İki haftadan eski tüm sistem kayıtları temizlenecek. Bu işlem geri alınamaz. Emin misiniz?",
+                    "Toplu Silme Onayı",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result == DialogResult.Yes)
+                {
+                    if (_dbManager.DeleteOldSystemLogs(14))
+                    {
+                        MessageBox.Show("Eski kayıtlar başarıyla temizlendi.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        DatabaseManager.Instance.LogSystem("INFO", "İki haftadan eski sistem kayıtları temizlendi", "SystemLogs.btnClearOldData_Click");
+                        LoadSystemLogs(); // Refresh grid
+                    }
+                    else
+                    {
+                        MessageBox.Show("Temizleme işlemi sırasında hata oluştu.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Toplu sistem kayıt temizleme hatası", "SystemLogs.btnClearOldData_Click", ex.ToString());
+                MessageBox.Show("Bir hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void InitializeFilters()
+        {
+            cmbLevelFilter.Items.Add("Tümü");
+            cmbLevelFilter.Items.Add("INFO");
+            cmbLevelFilter.Items.Add("WARNING");
+            cmbLevelFilter.Items.Add("ERROR");
+            cmbLevelFilter.SelectedIndex = 0;
+        }
+
+        private void FilterControl_Changed(object sender, EventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void ApplyFilters()
+        {
+            try
+            {
+                if (dataGridViewLogs.DataSource is DataTable dt)
+                {
+                    List<string> filters = new List<string>();
+
+                    // Message Filter
+                    if (!string.IsNullOrWhiteSpace(txtSearchMessage.Text))
+                    {
+                        filters.Add($"Message LIKE '%{txtSearchMessage.Text.Replace("'", "''")}%'");
+                    }
+
+                    // Level Filter
+                    if (cmbLevelFilter.SelectedIndex > 0)
+                    {
+                        filters.Add($"LogLevel = '{cmbLevelFilter.SelectedItem}'");
+                    }
+
+                    dt.DefaultView.RowFilter = string.Join(" AND ", filters);
+                }
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", "Filtreleme hatası", "SystemLogs.ApplyFilters", ex.ToString());
             }
         }
     }

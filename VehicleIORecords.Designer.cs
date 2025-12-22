@@ -21,6 +21,14 @@ namespace WinForms_RTSP_Player
             this.panelButtons = new System.Windows.Forms.Panel();
             this.btnDelete = new System.Windows.Forms.Button();
             this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnClearOldData = new System.Windows.Forms.Button();
+            this.panelFilters = new System.Windows.Forms.Panel();
+            this.lblPlateFilter = new System.Windows.Forms.Label();
+            this.txtSearchPlate = new System.Windows.Forms.TextBox();
+            this.lblTypeFilter = new System.Windows.Forms.Label();
+            this.cmbTypeFilter = new System.Windows.Forms.ComboBox();
+            this.lblAuthFilter = new System.Windows.Forms.Label();
+            this.cmbAuthFilter = new System.Windows.Forms.ComboBox();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewLogs)).BeginInit();
             this.panelButtons.SuspendLayout();
             this.SuspendLayout();
@@ -44,6 +52,7 @@ namespace WinForms_RTSP_Player
             // panelButtons
             // 
             this.panelButtons.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.panelButtons.Controls.Add(this.btnClearOldData);
             this.panelButtons.Controls.Add(this.btnRefresh);
             this.panelButtons.Controls.Add(this.btnDelete);
             this.panelButtons.Dock = System.Windows.Forms.DockStyle.Right;
@@ -52,6 +61,76 @@ namespace WinForms_RTSP_Player
             this.panelButtons.Padding = new System.Windows.Forms.Padding(10);
             this.panelButtons.Size = new System.Drawing.Size(166, 450);
             this.panelButtons.TabIndex = 1;
+            // 
+            // panelFilters
+            // 
+            this.panelFilters.BackColor = System.Drawing.Color.White;
+            this.panelFilters.Controls.Add(this.cmbAuthFilter);
+            this.panelFilters.Controls.Add(this.lblAuthFilter);
+            this.panelFilters.Controls.Add(this.cmbTypeFilter);
+            this.panelFilters.Controls.Add(this.lblTypeFilter);
+            this.panelFilters.Controls.Add(this.txtSearchPlate);
+            this.panelFilters.Controls.Add(this.lblPlateFilter);
+            this.panelFilters.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panelFilters.Location = new System.Drawing.Point(0, 0);
+            this.panelFilters.Name = "panelFilters";
+            this.panelFilters.Size = new System.Drawing.Size(634, 60);
+            this.panelFilters.TabIndex = 2;
+            // 
+            // lblPlateFilter
+            // 
+            this.lblPlateFilter.AutoSize = true;
+            this.lblPlateFilter.Location = new System.Drawing.Point(12, 12);
+            this.lblPlateFilter.Name = "lblPlateFilter";
+            this.lblPlateFilter.Size = new System.Drawing.Size(37, 13);
+            this.lblPlateFilter.TabIndex = 0;
+            this.lblPlateFilter.Text = "Plaka:";
+            // 
+            // txtSearchPlate
+            // 
+            this.txtSearchPlate.Location = new System.Drawing.Point(12, 28);
+            this.txtSearchPlate.Name = "txtSearchPlate";
+            this.txtSearchPlate.Size = new System.Drawing.Size(120, 20);
+            this.txtSearchPlate.TabIndex = 1;
+            this.txtSearchPlate.TextChanged += new System.EventHandler(this.FilterControl_Changed);
+            // 
+            // lblTypeFilter
+            // 
+            this.lblTypeFilter.AutoSize = true;
+            this.lblTypeFilter.Location = new System.Drawing.Point(150, 12);
+            this.lblTypeFilter.Name = "lblTypeFilter";
+            this.lblTypeFilter.Size = new System.Drawing.Size(61, 13);
+            this.lblTypeFilter.TabIndex = 2;
+            this.lblTypeFilter.Text = "Giriş/Çıkış:";
+            // 
+            // cmbTypeFilter
+            // 
+            this.cmbTypeFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbTypeFilter.FormattingEnabled = true;
+            this.cmbTypeFilter.Location = new System.Drawing.Point(150, 28);
+            this.cmbTypeFilter.Name = "cmbTypeFilter";
+            this.cmbTypeFilter.Size = new System.Drawing.Size(100, 21);
+            this.cmbTypeFilter.TabIndex = 3;
+            this.cmbTypeFilter.SelectedIndexChanged += new System.EventHandler(this.FilterControl_Changed);
+            // 
+            // lblAuthFilter
+            // 
+            this.lblAuthFilter.AutoSize = true;
+            this.lblAuthFilter.Location = new System.Drawing.Point(270, 12);
+            this.lblAuthFilter.Name = "lblAuthFilter";
+            this.lblAuthFilter.Size = new System.Drawing.Size(74, 13);
+            this.lblAuthFilter.TabIndex = 4;
+            this.lblAuthFilter.Text = "Yetki Durumu:";
+            // 
+            // cmbAuthFilter
+            // 
+            this.cmbAuthFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbAuthFilter.FormattingEnabled = true;
+            this.cmbAuthFilter.Location = new System.Drawing.Point(270, 28);
+            this.cmbAuthFilter.Name = "cmbAuthFilter";
+            this.cmbAuthFilter.Size = new System.Drawing.Size(100, 21);
+            this.cmbAuthFilter.TabIndex = 5;
+            this.cmbAuthFilter.SelectedIndexChanged += new System.EventHandler(this.FilterControl_Changed);
             // 
             // btnDelete
             // 
@@ -85,12 +164,29 @@ namespace WinForms_RTSP_Player
             this.btnRefresh.UseVisualStyleBackColor = false;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
             // 
+            // btnClearOldData
+            // 
+            this.btnClearOldData.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(127)))), ((int)(((byte)(140)))), ((int)(((byte)(141)))));
+            this.btnClearOldData.Dock = System.Windows.Forms.DockStyle.Top;
+            this.btnClearOldData.FlatAppearance.BorderSize = 0;
+            this.btnClearOldData.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnClearOldData.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnClearOldData.ForeColor = System.Drawing.Color.White;
+            this.btnClearOldData.Location = new Point(10, 100);
+            this.btnClearOldData.Name = "btnClearOldData";
+            this.btnClearOldData.Size = new System.Drawing.Size(146, 60);
+            this.btnClearOldData.TabIndex = 2;
+            this.btnClearOldData.Text = "Son iki hafta verilerinin dışındakileri temizle";
+            this.btnClearOldData.UseVisualStyleBackColor = false;
+            this.btnClearOldData.Click += new System.EventHandler(this.btnClearOldData_Click);
+            // 
             // VehicleIORecords
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Controls.Add(this.dataGridViewLogs);
+            this.Controls.Add(this.panelFilters);
             this.Controls.Add(this.panelButtons);
             this.Name = "VehicleIORecords";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
@@ -107,5 +203,13 @@ namespace WinForms_RTSP_Player
         private System.Windows.Forms.Panel panelButtons;
         private System.Windows.Forms.Button btnDelete;
         private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnClearOldData;
+        private System.Windows.Forms.Panel panelFilters;
+        private System.Windows.Forms.Label lblPlateFilter;
+        private System.Windows.Forms.TextBox txtSearchPlate;
+        private System.Windows.Forms.Label lblTypeFilter;
+        private System.Windows.Forms.ComboBox cmbTypeFilter;
+        private System.Windows.Forms.Label lblAuthFilter;
+        private System.Windows.Forms.ComboBox cmbAuthFilter;
     }
 }

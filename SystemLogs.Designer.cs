@@ -21,6 +21,12 @@ namespace WinForms_RTSP_Player
             this.panelButtons = new System.Windows.Forms.Panel();
             this.btnDelete = new System.Windows.Forms.Button();
             this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnClearOldData = new System.Windows.Forms.Button();
+            this.panelFilters = new System.Windows.Forms.Panel();
+            this.lblMessageFilter = new System.Windows.Forms.Label();
+            this.txtSearchMessage = new System.Windows.Forms.TextBox();
+            this.lblLevelFilter = new System.Windows.Forms.Label();
+            this.cmbLevelFilter = new System.Windows.Forms.ComboBox();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewLogs)).BeginInit();
             this.panelButtons.SuspendLayout();
             this.SuspendLayout();
@@ -44,6 +50,7 @@ namespace WinForms_RTSP_Player
             // panelButtons
             // 
             this.panelButtons.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.panelButtons.Controls.Add(this.btnClearOldData);
             this.panelButtons.Controls.Add(this.btnRefresh);
             this.panelButtons.Controls.Add(this.btnDelete);
             this.panelButtons.Dock = System.Windows.Forms.DockStyle.Right;
@@ -52,6 +59,55 @@ namespace WinForms_RTSP_Player
             this.panelButtons.Padding = new System.Windows.Forms.Padding(10);
             this.panelButtons.Size = new System.Drawing.Size(166, 450);
             this.panelButtons.TabIndex = 1;
+            // 
+            // panelFilters
+            // 
+            this.panelFilters.BackColor = System.Drawing.Color.White;
+            this.panelFilters.Controls.Add(this.cmbLevelFilter);
+            this.panelFilters.Controls.Add(this.lblLevelFilter);
+            this.panelFilters.Controls.Add(this.txtSearchMessage);
+            this.panelFilters.Controls.Add(this.lblMessageFilter);
+            this.panelFilters.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panelFilters.Location = new System.Drawing.Point(0, 0);
+            this.panelFilters.Name = "panelFilters";
+            this.panelFilters.Size = new System.Drawing.Size(634, 60);
+            this.panelFilters.TabIndex = 2;
+            // 
+            // lblMessageFilter
+            // 
+            this.lblMessageFilter.AutoSize = true;
+            this.lblMessageFilter.Location = new System.Drawing.Point(12, 12);
+            this.lblMessageFilter.Name = "lblMessageFilter";
+            this.lblMessageFilter.Size = new System.Drawing.Size(38, 13);
+            this.lblMessageFilter.TabIndex = 0;
+            this.lblMessageFilter.Text = "Mesaj:";
+            // 
+            // txtSearchMessage
+            // 
+            this.txtSearchMessage.Location = new System.Drawing.Point(12, 28);
+            this.txtSearchMessage.Name = "txtSearchMessage";
+            this.txtSearchMessage.Size = new System.Drawing.Size(200, 20);
+            this.txtSearchMessage.TabIndex = 1;
+            this.txtSearchMessage.TextChanged += new System.EventHandler(this.FilterControl_Changed);
+            // 
+            // lblLevelFilter
+            // 
+            this.lblLevelFilter.AutoSize = true;
+            this.lblLevelFilter.Location = new System.Drawing.Point(230, 12);
+            this.lblLevelFilter.Name = "lblLevelFilter";
+            this.lblLevelFilter.Size = new System.Drawing.Size(42, 13);
+            this.lblLevelFilter.TabIndex = 2;
+            this.lblLevelFilter.Text = "Seviye:";
+            // 
+            // cmbLevelFilter
+            // 
+            this.cmbLevelFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbLevelFilter.FormattingEnabled = true;
+            this.cmbLevelFilter.Location = new System.Drawing.Point(230, 28);
+            this.cmbLevelFilter.Name = "cmbLevelFilter";
+            this.cmbLevelFilter.Size = new System.Drawing.Size(100, 21);
+            this.cmbLevelFilter.TabIndex = 3;
+            this.cmbLevelFilter.SelectedIndexChanged += new System.EventHandler(this.FilterControl_Changed);
             // 
             // btnDelete
             // 
@@ -85,12 +141,29 @@ namespace WinForms_RTSP_Player
             this.btnRefresh.UseVisualStyleBackColor = false;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
             // 
+            // btnClearOldData
+            // 
+            this.btnClearOldData.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(127)))), ((int)(((byte)(140)))), ((int)(((byte)(141)))));
+            this.btnClearOldData.Dock = System.Windows.Forms.DockStyle.Top;
+            this.btnClearOldData.FlatAppearance.BorderSize = 0;
+            this.btnClearOldData.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnClearOldData.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnClearOldData.ForeColor = System.Drawing.Color.White;
+            this.btnClearOldData.Location = new Point(10, 100);
+            this.btnClearOldData.Name = "btnClearOldData";
+            this.btnClearOldData.Size = new System.Drawing.Size(146, 60);
+            this.btnClearOldData.TabIndex = 2;
+            this.btnClearOldData.Text = "Son iki hafta verilerinin dışındakileri temizle";
+            this.btnClearOldData.UseVisualStyleBackColor = false;
+            this.btnClearOldData.Click += new System.EventHandler(this.btnClearOldData_Click);
+            // 
             // SystemLogs
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Controls.Add(this.dataGridViewLogs);
+            this.Controls.Add(this.panelFilters);
             this.Controls.Add(this.panelButtons);
             this.Name = "SystemLogs";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
@@ -107,5 +180,11 @@ namespace WinForms_RTSP_Player
         private System.Windows.Forms.Panel panelButtons;
         private System.Windows.Forms.Button btnDelete;
         private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnClearOldData;
+        private System.Windows.Forms.Panel panelFilters;
+        private System.Windows.Forms.Label lblMessageFilter;
+        private System.Windows.Forms.TextBox txtSearchMessage;
+        private System.Windows.Forms.Label lblLevelFilter;
+        private System.Windows.Forms.ComboBox cmbLevelFilter;
     }
 }

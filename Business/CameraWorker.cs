@@ -46,6 +46,8 @@ namespace WinForms_RTSP_Player.Business
         private readonly object _resetLock = new object();     // Restart state
         
         private bool _isResetting = false;
+        private bool _firstFrameReceived = false;
+        private DateTime _startTime;
 
         // Timer intervals (ms)
         private int _frameCaptureInterval;
@@ -110,6 +112,9 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
+                _firstFrameReceived = false;
+                _startTime = DateTime.Now;
+
                 // VLC başlat
                 InitializeVLC();
 
@@ -126,11 +131,14 @@ namespace WinForms_RTSP_Player.Business
                 IsRunning = true;
 
                 // Plaka okuma timer'ını 3 saniye gecikmeli başlat
+                // ESKİ KAMERA İÇİN İYİLEŞTİRME (CAM_OUT genelde eski olandır)
+                int warmUpDelay = (CameraId == "CAM_OUT") ? 6000 : 3000;
+
                 if (_frameCaptureTimer != null)
                 {
-                    _frameCaptureTimer.Change(3000, Timeout.Infinite); // One-shot başlat (Tick içinde tekrar kurulacak)
+                    _frameCaptureTimer.Change(warmUpDelay, Timeout.Infinite); // One-shot başlat
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera ısınma süresi (3sn) başladı. {CameraId}");
+                    Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera ısınma süresi ({warmUpDelay}ms) başladı. {CameraId}");
 #endif
                 }
                 
@@ -218,15 +226,21 @@ namespace WinForms_RTSP_Player.Business
 
         private void InitializeVLC()
         {
+            // ESKİ KAMERA İÇİN ÖZEL AYARLAR (Dynamic Tuning)
+            // Eğer kamera "CAM_OUT" ise, caching'i artırıyoruz.
+            // "pts_delay increased" hatası, buffer yetmediğini gösterir.
+            int networkCaching = (CameraId == "CAM_OUT") ? 3000 : 1000;
+
             var libvlcOptions = new[]
             {
-                "--network-caching=1000",
+                $"--network-caching={networkCaching}", // Frame buffer süresi
+                "--rtsp-tcp",                 // UDP paket kaybını önlemek için TCP zorla
                 "--no-video-title-show",
                 "--no-osd",
                 "--no-snapshot-preview",
                 "--vout=gdi", 
                 "--avcodec-hw=none",
-                "--clock-jitter=1000",
+                "--clock-jitter=0",           // Jitter kontrolünü VLC'ye bırak
                 "--clock-synchro=0",
                 "--drop-late-frames",
                 "--skip-frames"
@@ -273,6 +287,7 @@ namespace WinForms_RTSP_Player.Business
             _mediaPlayer.TimeChanged += (s, e) =>
             {
                 _lastVideoUpdateTime = DateTime.Now;
+                _firstFrameReceived = true;
             };
 
             DatabaseManager.Instance.LogSystem("INFO", 
@@ -438,6 +453,18 @@ namespace WinForms_RTSP_Player.Business
                 {
                     DatabaseManager.Instance.LogSystem("WARNING", 
                         $"Kamera bağlantısı kesildi (State: {state}). Yeniden bağlanılıyor: {CameraId}", 
+                        $"CameraWorker.{CameraId}.CheckStreamHealth");
+
+                    AttemptReconnect();
+                    return;
+                }
+
+                // FIRST FRAME GUARD
+                // Eğer açılıştan beri 8 saniye geçti ve hala hiç frame gelmediyse, resetle.
+                if (!_firstFrameReceived && (DateTime.Now - _startTime).TotalSeconds > 8)
+                {
+                    DatabaseManager.Instance.LogSystem("WARNING", 
+                        $"İlk açılışta görüntü gelmedi (8sn First Frame Guard). Resetleniyor: {CameraId}", 
                         $"CameraWorker.{CameraId}.CheckStreamHealth");
 
                     AttemptReconnect();

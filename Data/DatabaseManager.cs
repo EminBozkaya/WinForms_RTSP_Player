@@ -120,6 +120,7 @@ namespace WinForms_RTSP_Player.Data
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         LogLevel TEXT NOT NULL, -- 'INFO', 'WARNING', 'ERROR'
                         Message TEXT NOT NULL,
+                        Component TEXT,
                         LogTime DATETIME DEFAULT (datetime('now', 'localtime')),
                         Details TEXT
                     )";
@@ -159,7 +160,7 @@ namespace WinForms_RTSP_Player.Data
                 InsertSystemDefaultParameters();
 
                 // Örnek plaka verileri ekle
-                //InsertSamplePlates();
+                InsertSamplePlates();
             }
         }
 
@@ -168,17 +169,17 @@ namespace WinForms_RTSP_Player.Data
             try
             {
                 // Standart Parametreler ve değerleri:
-                // Kamera & Akış Ayarları
-                AddSystemParameter("FrameCaptureTimerInterval", "1000", "Görüntü Yakalama Zaman Aralığı (ms)");
-                AddSystemParameter("StreamHealthTimerInterval", "30000", "Kamera Yayın Görüntü Kontrol Zaman Aralığı (ms)");
-                AddSystemParameter("HeartbeatTimerInterval", "300000", "Sistem Sağlığı Kontrol Zaman Aralığı (ms)");
-                AddSystemParameter("PeriodicResetTimerInterval", "600000", "Görüntü Yeniden Başlatma Zaman Aralığı (ms)");
+                // Kamera & Akış Ayarları (DB'de saniye olarak saklanır)
+                AddSystemParameter("FrameCaptureTimerInterval", "1", "Görüntü Yakalama Zaman Aralığı (saniye)");
+                AddSystemParameter("StreamHealthTimerInterval", "30", "Kamera Yayın Görüntü Kontrol Zaman Aralığı (saniye)");
+                AddSystemParameter("HeartbeatTimerInterval", "300", "Sistem Sağlığı Kontrol Zaman Aralığı (saniye)");
+                AddSystemParameter("PeriodicResetTimerInterval", "600", "Görüntü Yeniden Başlatma Zaman Aralığı (saniye)");
                 AddSystemParameter("PlateMinimumLength", "7", "Minimum Plaka Karakter Sayısı");
                 AddSystemParameter("FrameKontrolInterval", "10", "Kamera Frame Kontrol Zaman Aralığı (saniye)");
 
-                // UI Gösterim Süreleri
-                AddSystemParameter("AuthorizedPlateShowTime", "45000", "Kayıtlı Araç Plaka Gösterim Süresi (ms)");
-                AddSystemParameter("UnAuthorizedPlateShowTime", "10000", "Kayıtsız Araç Plaka Gösterim Süresi (ms)");
+                // UI Gösterim Süreleri (DB'de saniye olarak saklanır)
+                AddSystemParameter("AuthorizedPlateShowTime", "45", "Kayıtlı Araç Plaka Gösterim Süresi (saniye)");
+                AddSystemParameter("UnAuthorizedPlateShowTime", "10", "Kayıtsız Araç Plaka Gösterim Süresi (saniye)");
 
                 // Kayıt Gösterim Limitleri
                 AddSystemParameter("GetAccessLogLimit", "1000", "Araç Giriş-Çıkış Kayıt Gösterim Limiti (adet)");
@@ -188,8 +189,8 @@ namespace WinForms_RTSP_Player.Data
                 AddSystemParameter("UNAUTHORIZED_COOLDOWN_SECONDS", "60", "Kayıtsız Aynı Araç Log Kaydı Bekleme Süresi (saniye)");
                 AddSystemParameter("GATE_LOCK_SECONDS", "45", "Kapı Açılma Bekleme Süresi (saniye)");
                 AddSystemParameter("CROSS_DIRECTION_COOLDOWN_SECONDS", "45", "Aynı Araç Giriş-Çıkış Bekleme Süresi (saniye)");
-                AddSystemParameter("AuthorizedConfidenceThreshold", "70", "Kayıtlı Araç Plaka Okuma Doğruluğu Yüzdelik Eşiği");
-                AddSystemParameter("UnAuthorizedConfidenceThreshold", "75", "Kayıtsız Araç Plaka Okuma Doğruluğu Yüzdelik Eşiği");
+                AddSystemParameter("AuthorizedConfidenceThreshold", "70", "Kayıtlı Araç Plaka Okuma Doğruluk Eşiği (%)");
+                AddSystemParameter("UnAuthorizedConfidenceThreshold", "75", "Kayıtsız Araç Plaka Okuma Doğruluk Eşiği (%)");
             }
             catch (Exception ex)
             {
@@ -251,6 +252,33 @@ namespace WinForms_RTSP_Player.Data
             {
                 Console.WriteLine($"[{DateTime.Now}] Parametre güncelleme hatası: {ex.Message}");
                 return false;
+            }
+        }
+
+        public DataTable GetAllSystemParameters()
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"SELECT Id, Name, Detail, Value, CreatedDate, UpdatedDate 
+                                     FROM SystemParameter 
+                                     ORDER BY Name";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    using (var reader = command.ExecuteReader())
+                    {
+                        var dataTable = new DataTable();
+                        dataTable.Load(reader);
+                        return dataTable;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] Sistem parametreleri listeleme hatası: {ex.Message}");
+                return new DataTable();
             }
         }
 

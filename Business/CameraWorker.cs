@@ -94,7 +94,7 @@ namespace WinForms_RTSP_Player.Business
                 });
 
                 DatabaseManager.Instance.LogSystem("INFO", 
-                    $"Kamera başlatıldı: {CameraId} ({Direction}) - {_rtspUrl}", 
+                    $"Kamera başlatıldı: {CameraId} ({Direction})", 
                     $"CameraWorker.{CameraId}.Start");
             }
             catch (Exception ex)

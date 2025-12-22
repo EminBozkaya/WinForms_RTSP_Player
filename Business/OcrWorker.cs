@@ -111,6 +111,17 @@ namespace WinForms_RTSP_Player.Business
                 // Resmi diske yaz
                 File.WriteAllBytes(tempPath, job.ImageBytes);
 
+                // LATENCY METRIC
+                double latencyMs = (DateTime.Now - job.CapturedAt).TotalMilliseconds;
+#if DEBUG
+                // Sadece CİDDİ gecikme varsa (1000ms üzeri) logla
+                // Normal işlem süresi 200-500ms arası olabilir
+                if (latencyMs > 1000)
+                {
+                    Console.WriteLine($"[OCR_LATENCY] {latencyMs:F0} ms - {job.CameraId}");
+                }
+#endif
+
                 // OpenALPR çalıştır
                 string jsonResult = PlateRecognitionHelper.RunOpenALPR(tempPath);
                 
@@ -156,16 +167,23 @@ namespace WinForms_RTSP_Player.Business
 
         public void Dispose()
         {
+            // 1. Önce kuyruğu temizle (Kapanırken eski işleri yapmaya gerek yok)
+            ClearQueue();
+
+            // 2. Döngüyü kır
             _running = false;
-            _signal.Set(); // Thread'i son kez uyandır ki loop'tan çıksın
-            
-            // Thread'in bitmesini bekle (opsiyonel timeout ile)
+            _signal.Set(); // Thread'i son kez uyandır
+
+            // 3. Mevcut işin bitmesini bekle (Graceful Shutdown)
             if (_workerThread.IsAlive)
             {
-                _workerThread.Join(1000);
+                // Max 3 saniye bekle, bitmezse zorla kapatma riskini al
+                // (OCR işlemi genelde <500ms sürer)
+                _workerThread.Join(3000);
             }
             
             _signal.Dispose();
+            DatabaseManager.Instance.LogSystem("INFO", "OCR Worker kapatıldı.", "OcrWorker.Dispose");
         }
     }
 }

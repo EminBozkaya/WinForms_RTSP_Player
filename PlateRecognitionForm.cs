@@ -153,12 +153,13 @@ namespace WinForms_RTSP_Player
                 if (decision.Action == AccessAction.Allow)
                 {
                     string logMessage = decision.Direction == "IN" 
-                        ? $"Giriş İzni Verildi: {decision.Plate}" 
-                        : $"Çıkış İzni Verildi: {decision.Plate}";
+                        ? $"Giriş İzni Verildi | {decision.Plate} | {decision.Owner}" 
+                        : $"Çıkış İzni Verildi | {decision.Plate} | {decision.Owner}";
 
                     DatabaseManager.Instance.LogSystem("INFO",
                         logMessage,
-                        "Gate_Open");
+                        "Gate_Open",
+                        $"ID:{decision.GateOpId}");
 
                     // Arduino'ya kapı açma komutu gönder
                     _ = HardwareController.Instance.OpenGateAsync();

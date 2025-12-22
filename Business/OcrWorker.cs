@@ -52,10 +52,26 @@ namespace WinForms_RTSP_Player.Business
         {
             if (!_running) return;
 
-            // Kuyruk çok şişerse (örn: sistem tıkanırsa) eski işleri atlayabiliriz
-            // Şimdilik sadece yeni işi ekliyoruz.
+            // 1. KUYRUK ŞİŞMESİ KORUMASI
+            // Eğer kuyruk çok dolduysa (örn: 20 frame), sistem tıkanmış demektir.
+            // Eski frame'lerin hiçbir değeri yok (kapı senaryosunda).
+            // Hepsini silip en güncel frame'i işliyoruz.
+            if (_queue.Count > 20)
+            {
+                ClearQueue(); // Hepsini boşalt
+                DatabaseManager.Instance.LogSystem("WARNING", 
+                    "OCR Kuyruğu taştı, temizlendi.", 
+                    "OcrWorker.Enqueue");
+            }
+
             _queue.Enqueue(job);
             _signal.Set(); // Worker'ı uyandır
+        }
+
+        public void ClearQueue()
+        {
+            // Kuyruğu boşalt
+            while (_queue.TryDequeue(out _)) { }
         }
 
         private void ProcessLoop()

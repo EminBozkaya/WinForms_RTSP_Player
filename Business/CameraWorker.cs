@@ -298,6 +298,10 @@ namespace WinForms_RTSP_Player.Business
             {
                 Console.WriteLine($"[{DateTime.Now}] [RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId}");
 
+                // Restart sırasında kuyrukta bekleyen eski işleri temizle
+                // Bu sayede eski frame'lerin kapı açmasını engelleriz.
+                OcrWorker.Instance.ClearQueue();
+
                 DatabaseManager.Instance.LogSystem("INFO",
                     $"Kamera periyodik olarak resetleniyor (Gecikme önleme)",
                     $"CameraWorker.{CameraId}.Restart");

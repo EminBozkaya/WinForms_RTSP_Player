@@ -2,6 +2,7 @@ using LibVLCSharp.Shared;
 using LibVLCSharp.WinForms;
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WinForms_RTSP_Player.Data;
@@ -28,19 +29,29 @@ namespace WinForms_RTSP_Player.Business
         private MediaPlayer _mediaPlayer;
         private readonly VideoView _videoView; // Nullable - OUT kamerasında olmayabilir
 
-        // Timers
-        private System.Windows.Forms.Timer _frameCaptureTimer;
-        private System.Windows.Forms.Timer _streamHealthTimer;
-        private System.Windows.Forms.Timer _heartbeatTimer;
-        private System.Windows.Forms.Timer _periodicResetTimer;
+        // Timers - System.Threading.Timer for stability
+        private System.Threading.Timer _frameCaptureTimer;
+        private System.Threading.Timer _streamHealthTimer;
+        private System.Threading.Timer _heartbeatTimer;
+        private System.Threading.Timer _periodicResetTimer;
 
         // State tracking
-        private int _framesSinceLastReset = 0;
         private DateTime _lastVideoUpdateTime;
         private readonly string _rtspUrl;
         private bool _disposed = false;
-        private readonly object _resetLock = new object();
+        
+        // Granular Locks
+        private readonly object _frameLock = new object();     // OCR + snapshot
+        private readonly object _playerLock = new object();    // VLC Stop/Play
+        private readonly object _resetLock = new object();     // Restart state
+        
         private bool _isResetting = false;
+
+        // Timer intervals (ms)
+        private int _frameCaptureInterval;
+        private int _streamHealthInterval;
+        private int _heartbeatInterval;
+        private int _periodicResetInterval;
 
         public CameraWorker(string cameraId, string rtspUrl, string direction, VideoView videoView = null)
         {
@@ -48,6 +59,12 @@ namespace WinForms_RTSP_Player.Business
             Direction = direction ?? throw new ArgumentNullException(nameof(direction));
             _rtspUrl = rtspUrl ?? throw new ArgumentNullException(nameof(rtspUrl));
             _videoView = videoView;
+
+            // Load intervals
+            _frameCaptureInterval = SystemParameters.FrameCaptureTimerInterval;
+            _streamHealthInterval = SystemParameters.StreamHealthTimerInterval;
+            _heartbeatInterval = SystemParameters.HeartbeatTimerInterval;
+            _periodicResetInterval = SystemParameters.PeriodicResetTimerInterval;
 
             DatabaseManager.Instance.LogSystem("INFO", 
                 $"CameraWorker oluşturuldu: {CameraId} ({Direction})", 
@@ -75,23 +92,26 @@ namespace WinForms_RTSP_Player.Business
                 // Timers başlat
                 InitializeTimers();
 
-                // RTSP stream başlat - Medya bazlı seçeneklerle donanım hızlandırmayı zorla kapat
-                _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
+                // RTSP stream başlat
+                lock (_playerLock)
+                {
+                    _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
+                }
                 _lastVideoUpdateTime = DateTime.Now;
 
                 IsRunning = true;
 
-                // Plaka okuma timer'ını 3 saniye gecikmeli başlat (Isınma süresi - Hataları önlemek için)
-                Task.Delay(3000).ContinueWith(t => {
-                    if (IsRunning && _frameCaptureTimer != null && _videoView != null) {
-                        _videoView.BeginInvoke(new Action(() => {
-                            if (_frameCaptureTimer != null) {
-                                _frameCaptureTimer.Start();
-                                Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera ısınma süresi tamamlandı. Plaka okuma aktif: {CameraId}");
-                            }
-                        }));
-                    }
-                });
+                // Plaka okuma timer'ını 3 saniye gecikmeli başlat
+                if (_frameCaptureTimer != null)
+                {
+                    _frameCaptureTimer.Change(3000, Timeout.Infinite); // One-shot başlat (Tick içinde tekrar kurulacak)
+                    Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera ısınma süresi (3sn) başladı. {CameraId}");
+                }
+                
+                // Diğer timerları başlat
+                _streamHealthTimer?.Change(_streamHealthInterval, _streamHealthInterval);
+                _heartbeatTimer?.Change(_heartbeatInterval, _heartbeatInterval);
+                _periodicResetTimer?.Change(_periodicResetInterval, _periodicResetInterval);
 
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"Kamera başlatıldı: {CameraId} ({Direction})", 
@@ -117,27 +137,37 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
-                // UI bağlantısını kes (D3D11 hatalarını önlemek için en kritik adım)
-                if (_videoView != null && _videoView.InvokeRequired)
+                // Timerları durdur
+                _frameCaptureTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                _streamHealthTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                _heartbeatTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                _periodicResetTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+
+                // UI bağlantısını kes
+                if (_videoView != null && !_videoView.IsDisposed)
                 {
-                    _videoView.Invoke(new Action(() => { _videoView.MediaPlayer = null; }));
-                }
-                else if (_videoView != null)
-                {
-                    _videoView.MediaPlayer = null;
+                    if (_videoView.InvokeRequired)
+                    {
+                        try {
+                            _videoView.Invoke(new Action(() => { 
+                                if (!_videoView.IsDisposed) _videoView.MediaPlayer = null; 
+                            }));
+                        } catch { /* Ignored */ }
+                    }
+                    else
+                    {
+                         _videoView.MediaPlayer = null;
+                    }
                 }
 
-                _frameCaptureTimer?.Stop();
-                _streamHealthTimer?.Stop();
-                _heartbeatTimer?.Stop();
-                _periodicResetTimer?.Stop();
+                lock (_playerLock)
+                {
+                    _mediaPlayer?.Stop();
+                    _mediaPlayer?.Dispose();
+                    _mediaPlayer = null;
+                }
 
-                _mediaPlayer?.Stop();
-                
-                // Kaynakları tamamen temizle (Memory leak ve D3D11 çakışmalarını önlemek için)
-                _mediaPlayer?.Dispose();
                 _libVLC?.Dispose();
-                _mediaPlayer = null;
                 _libVLC = null;
 
                 IsRunning = false;
@@ -164,43 +194,32 @@ namespace WinForms_RTSP_Player.Business
         {
             var libvlcOptions = new[]
             {
-                // Ağ tamponunu 1 saniyeye çıkar (Daha stabil yayın)
                 "--network-caching=1000",
                 "--no-video-title-show",
                 "--no-osd",
                 "--no-snapshot-preview",
-                
-                // GÖRÜNTÜ MOTORUNU DEĞİŞTİR (D3D11 kilitlenmelerini önlemek için kritik)
-                // GDI en temel ve en sessiz motordur, thumbnail hatalarını önler.
                 "--vout=gdi", 
-                
-                // DONANIM HIZLANDIRMAYI KAPAT
                 "--avcodec-hw=none",
-                
-                "--clock-jitter=1000",  // Jitter toleransını artırın
+                "--clock-jitter=1000",
                 "--clock-synchro=0",
-                
                 "--drop-late-frames",
                 "--skip-frames"
-                // "--quiet" ve "--verbose" kaldırıldı ki hata mesajları handler'a ulaşabilsin
             };
 
-            // Temizlik yap (leak önleme)
             _mediaPlayer?.Dispose();
             _libVLC?.Dispose();
 
             _libVLC = new LibVLC(libvlcOptions);
             
-            // AKILLI FİLTRE: Sadece gerçekten kritik hataları konsola bas ve veritabanına logla
             _libVLC.Log += (s, e) => 
             {
-                // SetThumbNailClip hatası Windows görev çubuğuyla ilgilidir ve zararsızdır, onu ayıkla
-                if (e.Level == LogLevel.Error && !e.Message.Contains("SetThumbNailClip"))
+                if (e.Level == LogLevel.Error && 
+                    !e.Message.Contains("SetThumbNailClip") && 
+                    !e.Message.Contains("computer too slow"))
                 {
                     string logMsg = $"[VLC_ERROR] {e.Message}";
                     Console.WriteLine($"[{DateTime.Now}] {logMsg}");
                     
-                    // Önemli: Bu hataları kalıcı olarak veritabanına da kaydet
                     DatabaseManager.Instance.LogSystem("ERROR", 
                         $"VLC Kritik Hata: {e.Message}", 
                         $"CameraWorker.{CameraId}.VLCInternal", 
@@ -211,13 +230,18 @@ namespace WinForms_RTSP_Player.Business
             _mediaPlayer = new MediaPlayer(_libVLC);
             _mediaPlayer.Mute = true;
 
-            // VideoView varsa bağla (IN kamerasında var, OUT'ta yok)
             if (_videoView != null)
             {
-                _videoView.MediaPlayer = _mediaPlayer;
+                if (_videoView.InvokeRequired)
+                {
+                     _videoView.Invoke(new Action(() => _videoView.MediaPlayer = _mediaPlayer));
+                }
+                else
+                {
+                    _videoView.MediaPlayer = _mediaPlayer;
+                }
             }
 
-            // Video frame geldiğinde zaman damgasını güncelle
             _mediaPlayer.TimeChanged += (s, e) =>
             {
                 _lastVideoUpdateTime = DateTime.Now;
@@ -230,44 +254,24 @@ namespace WinForms_RTSP_Player.Business
 
         private void InitializeTimers()
         {
-            // Eski timerları temizle
             _frameCaptureTimer?.Dispose();
             _streamHealthTimer?.Dispose();
             _heartbeatTimer?.Dispose();
-            // Not: _periodicResetTimer reset sırasında yenilenir, disposal Start() içinde yapılabilir
-            // Ancak InitializeTimers her Start() çağrıldığında tetiklenir.
+            _periodicResetTimer?.Dispose();
             
-            // Frame capture timer - Hemen başlatmıyoruz, 3 sn ısınma süresi vereceğiz
-            _frameCaptureTimer = new System.Windows.Forms.Timer { Interval = SystemParameters.FrameCaptureTimerInterval };
-            _frameCaptureTimer.Tick += FrameCaptureTimer_Tick;
-            // _frameCaptureTimer.Start(); // Start() metodunda gecikmeli başlatılacak
-
-            // Stream health timer - Daha sık kontrol
-            _streamHealthTimer = new System.Windows.Forms.Timer { Interval = SystemParameters.StreamHealthTimerInterval };
-            _streamHealthTimer.Tick += (s, e) => CheckStreamHealth();
-            _streamHealthTimer.Start();
-
-            // Heartbeat timer - Akıllı heartbeat
-            if (_heartbeatTimer != null) _heartbeatTimer.Dispose();
-            _heartbeatTimer = new System.Windows.Forms.Timer();
-            _heartbeatTimer.Interval = SystemParameters.HeartbeatTimerInterval;
-            _heartbeatTimer.Tick += HeartbeatTimer_Tick;
-            _heartbeatTimer.Start();
-
-            // Periyodik Reset Timer (Sadece ilk kez oluşturulur, her Start'ta kontrol edilip başlatılır)
-            if (_periodicResetTimer == null)
-            {
-                _periodicResetTimer = new System.Windows.Forms.Timer();
-                _periodicResetTimer.Interval = SystemParameters.PeriodicResetTimerInterval;
-                _periodicResetTimer.Tick += (s, e) => Restart();
-            }
-            
-            if (!_periodicResetTimer.Enabled)
-                _periodicResetTimer.Start();
+            _frameCaptureTimer = new System.Threading.Timer(FrameCaptureTimer_Tick, null, Timeout.Infinite, Timeout.Infinite);
+            _streamHealthTimer = new System.Threading.Timer(CheckStreamHealth, null, Timeout.Infinite, Timeout.Infinite);
+            _heartbeatTimer = new System.Threading.Timer(HeartbeatTimer_Tick, null, Timeout.Infinite, Timeout.Infinite);
+            _periodicResetTimer = new System.Threading.Timer(PeriodicResetTimer_Tick, null, Timeout.Infinite, Timeout.Infinite);
 
             DatabaseManager.Instance.LogSystem("INFO", 
-                $"Timers başlatıldı: {CameraId}", 
+                $"Threading Timers başlatıldı: {CameraId}", 
                 $"CameraWorker.{CameraId}.InitializeTimers");
+        }
+
+        private void PeriodicResetTimer_Tick(object state)
+        {
+            Restart();
         }
 
         public void Restart()
@@ -276,123 +280,130 @@ namespace WinForms_RTSP_Player.Business
             {
                 if (_isResetting) return;
                 _isResetting = true;
+            }
 
-                try
-                {
-                    Console.WriteLine($"[{DateTime.Now}] [RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId}");
+            try
+            {
+                Console.WriteLine($"[{DateTime.Now}] [RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId}");
 
-                    DatabaseManager.Instance.LogSystem("INFO",
-                        $"Kamera periyodik olarak resetleniyor (Gecikme önleme)",
-                        $"CameraWorker.{CameraId}.Restart");
+                DatabaseManager.Instance.LogSystem("INFO",
+                    $"Kamera periyodik olarak resetleniyor (Gecikme önleme)",
+                    $"CameraWorker.{CameraId}.Restart");
 
-                    Stop();
+                Stop();
 
-                    // VLC'nin arka planda kaynakları serbest bırakması için kısa bir bekleme
-                    System.Threading.Thread.Sleep(3000);
+                System.Threading.Thread.Sleep(3000);
 
-                    Start();
-                }
-                finally
+                Start();
+            }
+            catch (Exception ex)
+            {
+                    DatabaseManager.Instance.LogSystem("ERROR",
+                    $"Restart hatası: {CameraId}",
+                    $"CameraWorker.{CameraId}.Restart",
+                    ex.ToString());
+            }
+            finally
+            {
+                lock (_resetLock)
                 {
                     _isResetting = false;
                 }
             }
         }
 
-        private async void FrameCaptureTimer_Tick(object sender, EventArgs e)
+        private void FrameCaptureTimer_Tick(object stateInfo)
         {
-            // Timer'ı durdur (re-entrancy önleme)
-            _frameCaptureTimer.Stop();
+            // One-Shot Timer Pattern: Timer otomatik tekrar etmez, biz manuel kurarız.
+            
+            string tempPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, 
+                $"temp_{CameraId}_{DateTime.UtcNow.Ticks}.jpg"
+            );
+            bool snapshotTaken = false;
 
-            try
+            bool lockTaken = false;
+            try 
             {
-                if (!IsRunning || _mediaPlayer == null || _isResetting)
-                    return;
-
-                var state = _mediaPlayer.State;
-                if (state != VLCState.Playing)
+                // LOCK SADECE SNAPSHOT İÇİN
+                Monitor.TryEnter(_frameLock, ref lockTaken);
+                if (lockTaken) 
                 {
-                    return;
-                }
-
-                string tempPath = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, 
-                    $"temp_{CameraId}.jpg"
-                );
-
-                if (_mediaPlayer.TakeSnapshot(0, tempPath, 0, 0))
-                {
-                    await Task.Run(() =>
+                    if (!_isResetting && IsRunning && _mediaPlayer != null)
                     {
-                        try
+                        var state = VLCState.Stopped;
+                        try { state = _mediaPlayer.State; } catch { }
+
+                        if (state == VLCState.Playing)
                         {
-                            if (!File.Exists(tempPath))
-                                return;
-
-                            // OCR işlemi
-                            string result = PlateRecognitionHelper.RunOpenALPR(tempPath);
-                            PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
-
-                            if (plateResult != null &&
-                                !string.IsNullOrEmpty(plateResult.Plate) &&
-                                plateResult.Plate.Length >= SystemParameters.PlateMinimumLength)
+                            if (_mediaPlayer.TakeSnapshot(0, tempPath, 0, 0))
                             {
-                                // Event fırlat
-                                OnPlateDetected(new PlateDetectedEventArgs
-                                {
-                                    CameraId = this.CameraId,
-                                    Direction = this.Direction,
-                                    Plate = plateResult.Plate,
-                                    Confidence = plateResult.Confidence,
-                                    DetectedAt = DateTime.Now
-                                });
+                                snapshotTaken = true;
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            DatabaseManager.Instance.LogSystem("ERROR", 
-                                $"OCR hatası: {CameraId}", 
-                                $"CameraWorker.{CameraId}.FrameCaptureTimer_Tick", 
-                                ex.ToString());
-                        }
-                        finally
-                        {
-                            if (File.Exists(tempPath))
-                                File.Delete(tempPath);
-                        }
-                    });
+                    }
                 }
-                else
-                {
-                    Console.WriteLine($"[{DateTime.Now}] [WARNING] Snapshot ALINAMADI: {CameraId} (VLC State: {_mediaPlayer.State})");
-                }
-            }
-            catch (Exception ex)
-            {
-                DatabaseManager.Instance.LogSystem("ERROR", 
-                    $"Frame capture hatası: {CameraId}", 
-                    $"CameraWorker.{CameraId}.FrameCaptureTimer_Tick", 
-                    ex.ToString());
             }
             finally
             {
-                // Timer'ı tekrar başlat
-                if (IsRunning)
-                    _frameCaptureTimer?.Start();
+                if (lockTaken)
+                    Monitor.Exit(_frameLock);
+            }
+
+            // OCR İŞLEMİ LOCK DIŞINDA (Uzun sürse de lock meşgul edilmez)
+            if (snapshotTaken && File.Exists(tempPath))
+            {
+                try
+                {
+                    string result = PlateRecognitionHelper.RunOpenALPR(tempPath);
+                    PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
+
+                    if (plateResult != null &&
+                        !string.IsNullOrEmpty(plateResult.Plate) &&
+                        plateResult.Plate.Length >= SystemParameters.PlateMinimumLength)
+                    {
+                        OnPlateDetected(new PlateDetectedEventArgs
+                        {
+                            CameraId = this.CameraId,
+                            Direction = this.Direction,
+                            Plate = plateResult.Plate,
+                            Confidence = plateResult.Confidence,
+                            DetectedAt = DateTime.Now
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DatabaseManager.Instance.LogSystem("ERROR", 
+                        $"OCR hatası: {CameraId}", 
+                        $"CameraWorker.{CameraId}.FrameCaptureTimer_Tick", 
+                        ex.ToString());
+                }
+                finally
+                {
+                    if (File.Exists(tempPath))
+                        File.Delete(tempPath);
+                }
+            }
+
+            // Timer'ı bir sonraki tur için yeniden kur
+            if (IsRunning)
+            {
+                try {
+                    _frameCaptureTimer?.Change(_frameCaptureInterval, Timeout.Infinite); 
+                } catch { }
             }
         }
 
-        private void CheckStreamHealth()
+        private void CheckStreamHealth(object stateInfo)
         {
             try
             {
                 if (_mediaPlayer == null || !IsRunning)
                     return;
 
-                // 1. MediaPlayer state kontrolü
                 var state = _mediaPlayer.State;
                 
-                // Eğer MediaPlayer durmuş veya hata durumundaysa
                 if (state == VLCState.Stopped || state == VLCState.Error || state == VLCState.Ended)
                 {
                     DatabaseManager.Instance.LogSystem("WARNING", 
@@ -403,10 +414,9 @@ namespace WinForms_RTSP_Player.Business
                     return;
                 }
 
-                // 2. Frame akışı kontrolü
                 var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
 
-                if (secondsSinceLastFrame > SystemParameters.FrameKontrolInterval) // Belirli süre boyunca yeni frame gelmediyse
+                if (secondsSinceLastFrame > SystemParameters.FrameKontrolInterval) 
                 {
                     DatabaseManager.Instance.LogSystem("WARNING", 
                         $"Frame akışı {secondsSinceLastFrame:F1} sn durdu (State: {state}). Yeniden bağlanılıyor: {CameraId}", 
@@ -426,37 +436,42 @@ namespace WinForms_RTSP_Player.Business
 
         private void AttemptReconnect()
         {
-            try
-            {
-                _mediaPlayer.Stop();
-                System.Threading.Thread.Sleep(500); // Kısa bir bekleme
-                _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
-                _lastVideoUpdateTime = DateTime.Now;
+            // Double-Check Locking (Paranoyak Seviye Güvenlik)
+            if (_isResetting) return;
 
-                DatabaseManager.Instance.LogSystem("INFO", 
-                    $"RTSP yeniden başlatıldı: {CameraId}", 
-                    $"CameraWorker.{CameraId}.AttemptReconnect");
-            }
-            catch (Exception ex)
+            lock (_playerLock)
             {
-                DatabaseManager.Instance.LogSystem("ERROR", 
-                    $"Yeniden bağlantı hatası: {CameraId}", 
-                    $"CameraWorker.{CameraId}.AttemptReconnect", 
-                    ex.ToString());
+                if (_isResetting) return;
+                
+                try
+                {
+                    if (_mediaPlayer == null) return;
+
+                    _mediaPlayer.Stop();
+                    Thread.Sleep(500); 
+                    _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
+                    _lastVideoUpdateTime = DateTime.Now;
+
+                    DatabaseManager.Instance.LogSystem("INFO", 
+                        $"RTSP yeniden başlatıldı: {CameraId}", 
+                        $"CameraWorker.{CameraId}.AttemptReconnect");
+                }
+                catch (Exception ex)
+                {
+                    DatabaseManager.Instance.LogSystem("ERROR", 
+                        $"Yeniden bağlantı hatası: {CameraId}", 
+                        $"CameraWorker.{CameraId}.AttemptReconnect", 
+                        ex.ToString());
+                }
             }
         }
 
-        private void HeartbeatTimer_Tick(object sender, EventArgs e)
+        private void HeartbeatTimer_Tick(object stateInfo)
         {
             try
             {
                 if (_mediaPlayer == null)
-                {
-                    DatabaseManager.Instance.LogSystem("ERROR", 
-                        $"Heartbeat: {CameraId} - MediaPlayer NULL!", 
-                        $"CameraWorker.{CameraId}.Heartbeat");
                     return;
-                }
 
                 var state = _mediaPlayer.State;
                 var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;

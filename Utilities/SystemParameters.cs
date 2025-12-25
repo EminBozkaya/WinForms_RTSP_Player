@@ -14,7 +14,7 @@ namespace WinForms_RTSP_Player.Utilities
         public static int StreamHealthTimerInterval { get; private set; } = 5000; //5 sn - Kamera Yayın Görüntü Kontrol Zaman Aralığı
         public static int HeartbeatTimerInterval { get; private set; } = 60000; //1 dk - Sistem Sağlığı Kontrol Zaman Aralığı
         public static int PeriodicResetTimerInterval { get; private set; } = 7200000; //2 saat - Görüntü Yeniden Başlatma Zaman Aralığı
-        public static int PlateMinimumLength { get; private set; } = 7; // Minimum Plaka Karakter Sayısı (TR için)
+        public static int PlateMinimumLength { get; private set; } = 6; // Minimum Plaka Karakter Sayısı (TR için min 7 fakat, 7'de 6 karakter, 8'de 7 doğru eşleşmeyi kabul etmek için min 6 ayarladık!)
         public static int FrameKontrolInterval { get; private set; } = 6; //6 sn - Kamera Frame Kontrol Zaman Aralığı
 
         // UI Gösterim Süreleri (ms cinsinden kullanılır, DB'de saniye olarak saklanır)
@@ -23,13 +23,13 @@ namespace WinForms_RTSP_Player.Utilities
 
         // Kayıt Gösterim Limitleri
         public static int GetAccessLogLimit { get; private set; } = 1000; //Araç Giriş-Çıkış Kayıt Gösterim Limiti
-        public static int GetSystemLogLimit { get; private set; } = 1000; //Sistem Kayıt Gösterim Limiti
+        public static int GetSystemLogLimit { get; private set; } = 3000; //Sistem Kayıt Gösterim Limiti
 
         // Erişim Karar Parametreleri
         public static int UNAUTHORIZED_COOLDOWN_SECONDS { get; private set; } = 60; //60 sn - Kayıtsız Aynı Araç Log Kaydı Bekleme Süresi
         public static int GATE_LOCK_SECONDS { get; private set; } = 45; //45 sn - Kapı Açılma Bekleme Süresi
         public static int CROSS_DIRECTION_COOLDOWN_SECONDS { get; private set; } = 45; //45 sn - Aynı Araç Giriş-Çıkış Bekleme Süresi
-        public static float AuthorizedConfidenceThreshold { get; private set; } = 70f; //Kayıtlı Araç Plaka Okuma Doğruluk Eşiği (%)
+        public static float AuthorizedConfidenceThreshold { get; private set; } = 65f; //Kayıtlı Araç Plaka Okuma Doğruluk Eşiği (%)
         public static float UnAuthorizedConfidenceThreshold { get; private set; } = 75f; //Kayıtsız Araç Plaka Okuma Doğruluk Eşiği (%)
 
         /// <summary>

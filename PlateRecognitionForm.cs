@@ -152,9 +152,10 @@ namespace WinForms_RTSP_Player
                 // Kapı kontrolü (Sadece Allow aksiyonu için)
                 if (decision.Action == AccessAction.Allow)
                 {
+                    string ocrInfo = decision.OcrPlate != decision.Plate ? $"OCR:{decision.OcrPlate}" : "";
                     string logMessage = decision.Direction == "IN" 
-                        ? $"Giriş İzni Verildi | {decision.Plate} | {decision.Owner}" 
-                        : $"Çıkış İzni Verildi | {decision.Plate} | {decision.Owner}";
+                        ? $"Giriş İzni Verildi | {decision.Plate} | {decision.Owner} | {ocrInfo}" 
+                        : $"Çıkış İzni Verildi | {decision.Plate} | {decision.Owner} | {ocrInfo}";
 
                     DatabaseManager.Instance.LogSystem("INFO",
                         logMessage,

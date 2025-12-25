@@ -454,6 +454,72 @@ namespace WinForms_RTSP_Player.Data
             }
         }
 
+        public bool TryAuthorizePlate(string ocrPlate, out string matchedDbPlate)
+        {
+            matchedDbPlate = null;
+
+            if (string.IsNullOrEmpty(ocrPlate))
+                return false;
+
+            var plates = GetActivePlates(); // List<string>
+
+            foreach (var dbPlate in plates)
+            {
+                if (IsMatchAccordingToRules(dbPlate, ocrPlate))
+                {
+                    matchedDbPlate = dbPlate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        private bool IsMatchAccordingToRules(string db, string ocr)
+        {
+            int dbLen = db.Length;
+            int ocrLen = ocr.Length;
+
+            // === LENGTH EŞİT ===
+            if (dbLen == ocrLen)
+            {
+                int matchCount = CountSequentialMatches(db, ocr);
+
+                if (dbLen == 8 && matchCount >= 7)
+                    return true;
+
+                if (dbLen == 7 && matchCount >= 6)
+                    return true;
+
+                return false;
+            }
+
+            // === OCR 1 KARAKTER KISA ===
+            if (dbLen == ocrLen + 1)
+            {
+                // Baştan drop
+                if (db.Substring(1) == ocr)
+                    return true;
+
+                // Sondan drop
+                if (db.Substring(0, dbLen - 1) == ocr)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private int CountSequentialMatches(string a, string b)
+        {
+            int count = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] == b[i])
+                    count++;
+            }
+            return count;
+        }
+
+
         public bool IsPlateAuthorized(string plateNumber)
         {
             try
@@ -566,6 +632,35 @@ namespace WinForms_RTSP_Player.Data
             }
         }
 
+        public List<string> GetActivePlates()
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "SELECT PlateNumber FROM Plates WHERE IsActive = 1 ORDER BY CreatedDate DESC";
+
+                    using (var command = new SqliteCommand(query, connection))
+                    using (var reader = command.ExecuteReader())
+                    {
+                        var plates = new List<string>();
+                        while (reader.Read())
+                        {
+                            plates.Add(reader.GetString(0));
+                        }
+                        return plates;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] Plaka listesi alma hatası: {ex.Message}");
+#endif
+                return new List<string>();
+            }
+        }
         public DataTable GetPlates()
         {
             try

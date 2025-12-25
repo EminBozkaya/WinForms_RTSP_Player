@@ -51,29 +51,36 @@ namespace WinForms_RTSP_Player.Business
             {
                 try
                 {
+                    //Şayet doğruluk, min değerin de altında ise diğer işlemlere gerek yok. (min doğruluk = kayıtlı araçlar için tahsis edilen doğruluk yüzdesi)
+                    if (confidence < SystemParameters.AuthorizedConfidenceThreshold || plate!.Length < 6)
+                    {
+                        return new AccessDecision
+                        {
+                            Plate = plate,
+                            Direction = direction,
+                            Action = AccessAction.Ignore,
+                            Reason = $"Düşük güven skoru: {confidence:F1}% < {SystemParameters.AuthorizedConfidenceThreshold}%",
+                            IsAuthorized = false,
+                            Confidence = confidence
+                        };
+                    }
+
                     // 1. Plaka formatını düzelt
                     string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plate);
 
                     // 2. Yetkilendirme kontrolü
-                    bool isAuthorized = DatabaseManager.Instance.IsPlateAuthorized(correctedPlate);
+                    //bool isAuthorized = DatabaseManager.Instance.IsPlateAuthorized(correctedPlate);
+                    bool isAuthorized = DatabaseManager.Instance.TryAuthorizePlate(
+                                            correctedPlate,
+                                            out string matchedDbPlate
+                                        );
 
                     // 3. Confidence threshold (yetkili için daha düşük)
                     float confidenceThreshold = isAuthorized 
                         ? SystemParameters.AuthorizedConfidenceThreshold 
                         : SystemParameters.UnAuthorizedConfidenceThreshold;
 
-                    if (confidence < confidenceThreshold)
-                    {
-                        return new AccessDecision
-                        {
-                            Plate = correctedPlate,
-                            Direction = direction,
-                            Action = AccessAction.Ignore,
-                            Reason = $"Düşük güven skoru: {confidence:F1}% < {confidenceThreshold}%",
-                            IsAuthorized = isAuthorized,
-                            Confidence = confidence
-                        };
-                    }
+                    
 
                     // 4. Global Gate Lock kontrolü
                     // Eğer kapı zaten açıksa (herhangi bir yönden), hiçbir işlem yapma
@@ -117,11 +124,11 @@ namespace WinForms_RTSP_Player.Business
                     // 6. Direction-specific logic
                     if (direction == "IN")
                     {
-                        return ProcessINDirection(correctedPlate, isAuthorized, confidence);
+                        return ProcessINDirection(matchedDbPlate, isAuthorized, confidence, correctedPlate);
                     }
                     else if (direction == "OUT")
                     {
-                        return ProcessOUTDirection(correctedPlate, isAuthorized, confidence);
+                        return ProcessOUTDirection(matchedDbPlate, isAuthorized, confidence, correctedPlate);
                     }
                     else
                     {
@@ -159,7 +166,7 @@ namespace WinForms_RTSP_Player.Business
             }
         }
 
-        private AccessDecision ProcessINDirection(string plate, bool isAuthorized, double confidence)
+        private AccessDecision ProcessINDirection(string plate, bool isAuthorized, double confidence, string ocrPlate)
         {
             // YETKİLİ ARAÇ
             if (isAuthorized)
@@ -176,12 +183,14 @@ namespace WinForms_RTSP_Player.Business
 
                 // 5. Canonical Log
 #if DEBUG
-                Console.WriteLine($"[PLATE] {plate} | IN | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner}");
+                string ocrInfo = ocrPlate != plate ? $"OCR:{ocrPlate}" : "";
+                Console.WriteLine($"[PLATE] {plate} | IN | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
 #endif
 
                 return new AccessDecision
                 {
                     Plate = plate,
+                    OcrPlate = ocrPlate,
                     Direction = "IN",
                     Action = AccessAction.Allow,
                     Reason = "Yetkili araç - giriş izni verildi",
@@ -237,7 +246,7 @@ namespace WinForms_RTSP_Player.Business
             }
         }
 
-        private AccessDecision ProcessOUTDirection(string plate, bool isAuthorized, double confidence)
+        private AccessDecision ProcessOUTDirection(string plate, bool isAuthorized, double confidence, string ocrPlate)
         {
             // YETKİLİ ARAÇ
             if (isAuthorized)
@@ -251,15 +260,17 @@ namespace WinForms_RTSP_Player.Business
 
                 string owner = DatabaseManager.Instance.GetPlateOwner(plate);
                 Guid gateOpId = Guid.NewGuid(); // 2. Gate Trigger Idempotency Token
-                
+
                 // 5. Canonical Log
 #if DEBUG
-                Console.WriteLine($"[PLATE] {plate} | OUT | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner}");
+                string ocrInfo = ocrPlate != plate ? $"OCR:{ocrPlate}" : "";
+                Console.WriteLine($"[PLATE] {plate} | OUT | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
 #endif
 
                 return new AccessDecision
                 {
                     Plate = plate,
+                    OcrPlate = ocrPlate,
                     Direction = "OUT",
                     Action = AccessAction.Allow,
                     Reason = "Yetkili araç - çıkış izni verildi",
@@ -384,6 +395,7 @@ namespace WinForms_RTSP_Player.Business
     public class AccessDecision
     {
         public string Plate { get; set; }
+        public string? OcrPlate { get; set; }
         public string Direction { get; set; }
         public AccessAction Action { get; set; }
         public string Reason { get; set; }

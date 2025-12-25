@@ -153,7 +153,8 @@ namespace WinForms_RTSP_Player.Business
                         Direction = job.Direction,
                         Plate = plateResult.Plate,
                         Confidence = plateResult.Confidence,
-                        DetectedAt = job.CapturedAt // Görüntünün alındığı zamanı kullan
+                        DetectedAt = DateTime.Now,  // OCR işleme zamanı
+                        CapturedAt = job.CapturedAt // Frame yakalama zamanı (restart filtering için)
                     });
                 }
             }

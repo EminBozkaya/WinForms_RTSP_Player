@@ -124,11 +124,11 @@ namespace WinForms_RTSP_Player.Business
                     // 6. Direction-specific logic
                     if (direction == "IN")
                     {
-                        return ProcessINDirection(matchedDbPlate, isAuthorized, confidence, correctedPlate);
+                        return ProcessINDirection(correctedPlate, isAuthorized, confidence, matchedDbPlate);
                     }
                     else if (direction == "OUT")
                     {
-                        return ProcessOUTDirection(matchedDbPlate, isAuthorized, confidence, correctedPlate);
+                        return ProcessOUTDirection(correctedPlate, isAuthorized, confidence, matchedDbPlate);
                     }
                     else
                     {
@@ -166,7 +166,7 @@ namespace WinForms_RTSP_Player.Business
             }
         }
 
-        private AccessDecision ProcessINDirection(string plate, bool isAuthorized, double confidence, string ocrPlate)
+        private AccessDecision ProcessINDirection(string plate, bool isAuthorized, double confidence, string machedDbPlate)
         {
             // YETKİLİ ARAÇ
             if (isAuthorized)
@@ -178,19 +178,19 @@ namespace WinForms_RTSP_Player.Business
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "IN");
 
-                string owner = DatabaseManager.Instance.GetPlateOwner(plate);
+                string owner = DatabaseManager.Instance.GetPlateOwner(machedDbPlate); // Authorized olduğu için veritabanındaki plaka ile al
                 Guid gateOpId = Guid.NewGuid(); // 2. Gate Trigger Idempotency Token
 
                 // 5. Canonical Log
 #if DEBUG
-                string ocrInfo = ocrPlate != plate ? $"OCR:{ocrPlate}" : "";
-                Console.WriteLine($"[PLATE] {plate} | IN | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
+                string ocrInfo = machedDbPlate != plate ? $"OCR:{plate}" : "";
+                Console.WriteLine($"[PLATE] {machedDbPlate} | IN | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
 #endif
 
                 return new AccessDecision
                 {
-                    Plate = plate,
-                    OcrPlate = ocrPlate,
+                    Plate = machedDbPlate,
+                    OcrPlate = plate,
                     Direction = "IN",
                     Action = AccessAction.Allow,
                     Reason = "Yetkili araç - giriş izni verildi",
@@ -203,16 +203,16 @@ namespace WinForms_RTSP_Player.Business
             // YETKİSİZ ARAÇ
             else
             {
-                if (IsUnauthorizedCooldownActiveIN(ocrPlate))
+                if (IsUnauthorizedCooldownActiveIN(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {ocrPlate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
 #endif
                     
                     return new AccessDecision
                     {
-                        Plate = ocrPlate,
+                        Plate = plate,
                         Direction = "IN",
                         Action = AccessAction.Ignore,
                         Reason = "Yetkisiz araç - cooldown aktif",
@@ -222,20 +222,20 @@ namespace WinForms_RTSP_Player.Business
                 }
 
                 // Yetkisiz araç - log at
-                _lastUnauthorizedPlateIN = ocrPlate;
+                _lastUnauthorizedPlateIN = plate;
                 _lastUnauthorizedLogTimeIN = DateTime.Now;
-                _lastProcessedPlateIN = ocrPlate;
+                _lastProcessedPlateIN = plate;
 
                 // Global tracking güncelle
-                UpdateGlobalTracking(ocrPlate, "IN");
+                UpdateGlobalTracking(plate, "IN");
 
 #if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {ocrPlate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {plate}");
 #endif
 
                 return new AccessDecision
                 {
-                    Plate = ocrPlate,
+                    Plate = plate,
                     Direction = "IN",
                     Action = AccessAction.Deny,
                     Reason = "Yetkisiz araç - giriş reddedildi",
@@ -246,7 +246,7 @@ namespace WinForms_RTSP_Player.Business
             }
         }
 
-        private AccessDecision ProcessOUTDirection(string plate, bool isAuthorized, double confidence, string ocrPlate)
+        private AccessDecision ProcessOUTDirection(string plate, bool isAuthorized, double confidence, string machedDbPlate)
         {
             // YETKİLİ ARAÇ
             if (isAuthorized)
@@ -258,19 +258,19 @@ namespace WinForms_RTSP_Player.Business
                 // Global tracking güncelle
                 UpdateGlobalTracking(plate, "OUT");
 
-                string owner = DatabaseManager.Instance.GetPlateOwner(plate);
+                string owner = DatabaseManager.Instance.GetPlateOwner(machedDbPlate); // Authorized olduğu için veritabanındaki plaka ile al
                 Guid gateOpId = Guid.NewGuid(); // 2. Gate Trigger Idempotency Token
 
                 // 5. Canonical Log
 #if DEBUG
-                string ocrInfo = ocrPlate != plate ? $"OCR:{ocrPlate}" : "";
-                Console.WriteLine($"[PLATE] {plate} | OUT | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
+                string ocrInfo = machedDbPlate != plate ? $"OCR:{plate}" : "";
+                Console.WriteLine($"[PLATE] {machedDbPlate} | OUT | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
 #endif
 
                 return new AccessDecision
                 {
-                    Plate = plate,
-                    OcrPlate = ocrPlate,
+                    Plate = machedDbPlate,
+                    OcrPlate = plate,
                     Direction = "OUT",
                     Action = AccessAction.Allow,
                     Reason = "Yetkili araç - çıkış izni verildi",
@@ -283,16 +283,16 @@ namespace WinForms_RTSP_Player.Business
             // YETKİSİZ ARAÇ
             else
             {
-                if (IsUnauthorizedCooldownActiveOUT(ocrPlate))
+                if (IsUnauthorizedCooldownActiveOUT(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {ocrPlate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
 #endif
 
                     return new AccessDecision
                     {
-                        Plate = ocrPlate,
+                        Plate = plate,
                         Direction = "OUT",
                         Action = AccessAction.Ignore,
                         Reason = "Yetkisiz araç - cooldown aktif",
@@ -307,15 +307,15 @@ namespace WinForms_RTSP_Player.Business
                 _lastProcessedPlateOUT = plate;
 
                 // Global tracking güncelle
-                UpdateGlobalTracking(ocrPlate, "OUT");
+                UpdateGlobalTracking(plate, "OUT");
 
 #if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {ocrPlate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {plate}");
 #endif
 
                 return new AccessDecision
                 {
-                    Plate = ocrPlate,
+                    Plate = plate,
                     Direction = "OUT",
                     Action = AccessAction.Deny,
                     Reason = "Yetkisiz araç - çıkış reddedildi",

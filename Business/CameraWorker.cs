@@ -48,6 +48,9 @@ namespace WinForms_RTSP_Player.Business
         private bool _isResetting = false;
         private bool _firstFrameReceived = false;
         private DateTime _startTime;
+        
+        // Restart timestamp (Pre-restart frame filtering için)
+        private DateTime _restartInitiatedAt = DateTime.MinValue;
 
         // Timer intervals (ms)
         private int _frameCaptureInterval;
@@ -89,7 +92,22 @@ namespace WinForms_RTSP_Player.Business
         {
             if (e.CameraId == this.CameraId)
             {
-                // 1. TIMESTAMP DRIFT GUARD
+                // 1. PRE-RESTART FRAME CHECK
+                // Eğer bu frame restart öncesinden geliyorsa atla
+                // Bu sayede diğer kameraların frame'lerini etkilemeden sadece bu kameranın eski frame'lerini filtreleriz
+                if (e.CapturedAt < _restartInitiatedAt)
+                {
+                    DatabaseManager.Instance.LogSystem("WARNING",
+                        $"Pre-restart frame atlandı: {e.Plate} (Captured: {e.CapturedAt:HH:mm:ss}, Restart: {_restartInitiatedAt:HH:mm:ss})",
+                        $"CameraWorker.{CameraId}.OcrWorker_PlateDetected");
+
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [WARNING] Pre-restart frame atlandı: {e.Plate} - CameraWorker.{CameraId}");
+#endif
+                    return;
+                }
+
+                // 2. TIMESTAMP DRIFT GUARD
                 // Eğer OCR sonucu çok geç geldiyse (örn: 5 sn), bu bilgi artık bayattır.
                 // Kapı önündeki araç gitmiş olabilir.
                 double latency = (DateTime.Now - e.DetectedAt).TotalSeconds;
@@ -226,10 +244,10 @@ namespace WinForms_RTSP_Player.Business
 
                 IsRunning = false;
 
-                // Agresif hafıza temizliği
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
+                // ====== GC.Collect() KALDIRILDI ======
+                // Sebep: Stop-the-world pause riski (100-500ms freeze)
+                // GC otomatik olarak yönetilecek
+                // Gece bakım modunda (03:00) güvenli şekilde yapılacak
 
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"Kamera durduruldu: {CameraId}", 
@@ -381,35 +399,65 @@ namespace WinForms_RTSP_Player.Business
 
             try
             {
-#if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] [RESET] Kamera periyodik olarak yeniden başlatılıyor: {CameraId}");
-#endif
-
-                // Restart sırasında kuyrukta bekleyen eski işleri temizle
-                // Bu sayede eski frame'lerin kapı açmasını engelleriz.
-                OcrWorker.Instance.ClearQueue();
+                // ====== RESTART TIMESTAMP (Frame Filtering İçin) ======
+                // Bu timestamp, restart öncesi çekilen frame'leri filtrelemek için kullanılır
+                // ClearQueue() yerine timestamp-based filtering kullanıyoruz
+                // Böylece diğer kameraların frame'lerini etkilemiyoruz
+                _restartInitiatedAt = DateTime.Now;
 
                 DatabaseManager.Instance.LogSystem("INFO",
-                    $"Kamera periyodik olarak resetleniyor (Gecikme önleme)",
+                    $"Kamera restart başlatıldı: {CameraId}",
                     $"CameraWorker.{CameraId}.Restart");
+
 #if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera periyodik olarak resetleniyor (Gecikme önleme) - CameraWorker.{CameraId}.Restart");
+                Console.WriteLine($"[{DateTime.Now}] [RESET] Kamera restart başlatıldı: {CameraId}");
 #endif
+
+                // ====== QUEUE CLEAR KALDIRILDI ======
+                // Sebep: Diğer kameraların frame'lerini de siler (side-effect)
+                // Çözüm: Timestamp-based filtering (OcrWorker_PlateDetected içinde)
+                // OcrWorker.Instance.ClearQueue(); // KALDIRILDI
 
                 Stop();
 
-                System.Threading.Thread.Sleep(3000);
+                // ====== KAMERA-SPESİFİK BEKLEME ======
+                // Eski kamera (CAM_OUT) daha uzun süre beklemeli
+                int waitTime = (CameraId == "CAM_OUT") ? 5000 : 3000;
+                
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] Restart için {waitTime}ms bekleniyor: {CameraId}");
+#endif
+                
+                DatabaseManager.Instance.LogSystem("INFO",
+                    $"Restart için {waitTime}ms bekleniyor: {CameraId}",
+                    $"CameraWorker.{CameraId}.Restart");
+                
+                System.Threading.Thread.Sleep(waitTime);
+
+                // ====== GC.Collect() KALDIRILDI ======
+                // Sebep: Stop-the-world pause riski
+                // GC otomatik olarak yönetilecek
+                // Gece bakım modunda (03:00) güvenli şekilde yapılacak
 
                 Start();
+                
+                DatabaseManager.Instance.LogSystem("INFO",
+                    $"Kamera restart tamamlandı: {CameraId}",
+                    $"CameraWorker.{CameraId}.Restart");
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera restart tamamlandı: {CameraId}");
+#endif
             }
             catch (Exception ex)
             {
-                    DatabaseManager.Instance.LogSystem("ERROR",
+                DatabaseManager.Instance.LogSystem("ERROR",
                     $"Restart hatası: {CameraId}",
                     $"CameraWorker.{CameraId}.Restart",
                     ex.ToString());
+                    
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] [ERROR] Restart hatası: {CameraId} - CameraWorker.{CameraId}.Restart - {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Restart hatası: {CameraId} - {ex.Message}");
 #endif
             }
             finally
@@ -824,6 +872,7 @@ namespace WinForms_RTSP_Player.Business
         public string Direction { get; set; }
         public string Plate { get; set; }
         public double Confidence { get; set; }
-        public DateTime DetectedAt { get; set; }
+        public DateTime DetectedAt { get; set; }  // OCR işleme zamanı
+        public DateTime CapturedAt { get; set; }  // Frame yakalama zamanı (restart filtering için)
     }
 }

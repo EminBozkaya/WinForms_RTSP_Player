@@ -19,6 +19,9 @@ namespace WinForms_RTSP_Player
         private System.Windows.Forms.Timer _uiResetTimerIN;
         private System.Windows.Forms.Timer _uiResetTimerOUT;
 
+        // Maintenance mode (Gece bakım modu - 03:00)
+        private System.Threading.Timer _maintenanceTimer;
+
         // Database manager
         private DatabaseManager _databaseManager;
 
@@ -87,6 +90,9 @@ namespace WinForms_RTSP_Player
                 {
                     HardwareController.Instance.Initialize(arduinoPort, baudRate);
                 }
+
+                // Gece bakım modunu başlat
+                InitializeMaintenanceMode();
             }
             catch (Exception ex)
             {
@@ -291,6 +297,138 @@ namespace WinForms_RTSP_Player
             catch (Exception ex)
             {
                 DatabaseManager.Instance.LogSystem("ERROR", "Geri dönme hatası", "PlateRecognitionForm.btnBack_Click", ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// Gece bakım modunu başlatır (Her gece saat 03:00'da çalışır)
+        /// </summary>
+        private void InitializeMaintenanceMode()
+        {
+            try
+            {
+                var now = DateTime.Now;
+                var scheduledTime = new DateTime(now.Year, now.Month, now.Day, 3, 0, 0);
+                
+                // Eğer bugünün 03:00'ı geçtiyse, yarının 03:00'ını ayarla
+                if (now > scheduledTime)
+                    scheduledTime = scheduledTime.AddDays(1);
+
+                var timeUntil = scheduledTime - now;
+                
+                // Timer'ı ayarla (ilk çalışma zamanı ve 24 saat periyot)
+                _maintenanceTimer = new System.Threading.Timer(
+                    PerformMaintenanceCycle, 
+                    null, 
+                    (int)timeUntil.TotalMilliseconds, 
+                    24 * 60 * 60 * 1000 // 24 saat
+                );
+
+                DatabaseManager.Instance.LogSystem("INFO", 
+                    $"Gece bakım modu ayarlandı. İlk çalışma: {scheduledTime:yyyy-MM-dd HH:mm:ss}", 
+                    "PlateRecognitionForm.InitializeMaintenanceMode");
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] Gece bakım modu ayarlandı. İlk çalışma: {scheduledTime:yyyy-MM-dd HH:mm:ss}");
+#endif
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", 
+                    "Gece bakım modu başlatma hatası", 
+                    "PlateRecognitionForm.InitializeMaintenanceMode", 
+                    ex.ToString());
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Gece bakım modu başlatma hatası: {ex.Message}");
+#endif
+            }
+        }
+
+        /// <summary>
+        /// Gece bakım döngüsü - Kameraları durdur, GC yap, yeniden başlat
+        /// </summary>
+        private void PerformMaintenanceCycle(object state)
+        {
+            try
+            {
+                DatabaseManager.Instance.LogSystem("INFO", 
+                    "Gece bakım modu başlatılıyor (03:00)", 
+                    "PlateRecognitionForm.MaintenanceMode");
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [MAINTENANCE] Gece bakım modu başlatılıyor (03:00)");
+#endif
+
+                // 1. Kameraları durdur
+                _cameraWorkerIN?.Stop();
+                _cameraWorkerOUT?.Stop();
+
+                DatabaseManager.Instance.LogSystem("INFO", 
+                    "Kameralar durduruldu (Bakım modu)", 
+                    "PlateRecognitionForm.MaintenanceMode");
+
+                System.Threading.Thread.Sleep(2000);
+
+                // 2. Şimdi GC güvenli (Kameralar kapalı, OCR işlemi yok)
+                DatabaseManager.Instance.LogSystem("INFO", 
+                    "Bellek temizliği başlatılıyor (GC)", 
+                    "PlateRecognitionForm.MaintenanceMode");
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [MAINTENANCE] GC başlatılıyor...");
+#endif
+
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+
+                DatabaseManager.Instance.LogSystem("INFO", 
+                    "Bellek temizliği tamamlandı", 
+                    "PlateRecognitionForm.MaintenanceMode");
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [MAINTENANCE] GC tamamlandı");
+#endif
+
+                System.Threading.Thread.Sleep(2000);
+
+                // 3. Kameraları yeniden başlat
+                _cameraWorkerIN?.Start();
+                _cameraWorkerOUT?.Start();
+
+                DatabaseManager.Instance.LogSystem("INFO", 
+                    "Gece bakım modu tamamlandı - Kameralar yeniden başlatıldı", 
+                    "PlateRecognitionForm.MaintenanceMode");
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [MAINTENANCE] Gece bakım modu tamamlandı");
+#endif
+            }
+            catch (Exception ex)
+            {
+                DatabaseManager.Instance.LogSystem("ERROR", 
+                    "Gece bakım modu hatası", 
+                    "PlateRecognitionForm.MaintenanceMode", 
+                    ex.ToString());
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Gece bakım modu hatası: {ex.Message}");
+#endif
+
+                // Hata durumunda kameraları yeniden başlatmayı dene
+                try
+                {
+                    _cameraWorkerIN?.Start();
+                    _cameraWorkerOUT?.Start();
+                }
+                catch (Exception restartEx)
+                {
+                    DatabaseManager.Instance.LogSystem("ERROR", 
+                        "Bakım modu sonrası kamera başlatma hatası", 
+                        "PlateRecognitionForm.MaintenanceMode", 
+                        restartEx.ToString());
+                }
             }
         }
     }

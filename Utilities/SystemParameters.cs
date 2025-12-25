@@ -24,7 +24,7 @@ namespace WinForms_RTSP_Player.Utilities
         // Kayıt Gösterim Limitleri
         public static int GetAccessLogLimit { get; private set; } = 3000; //Araç Giriş-Çıkış Kayıt Gösterim Limiti
         public static int GetSystemLogLimit { get; private set; } = 3000; //Sistem Kayıt Gösterim Limiti
-        public static int LogDisplayDays { get; private set; } = 3; // Varsayılan log gösterim günü (geçmiş)
+        public static int LogDisplayDays { get; private set; } = 3; // Varsayılan Log Gösterim Son Gün Sayısı (geçmiş)
 
         // Erişim Karar Parametreleri
         public static int UNAUTHORIZED_COOLDOWN_SECONDS { get; private set; } = 60; //60 sn - Kayıtsız Aynı Araç Log Kaydı Bekleme Süresi
@@ -69,7 +69,7 @@ namespace WinForms_RTSP_Player.Utilities
                 LogDisplayDays = GetInt(db, "LogDisplayDays", 3);
 
                 // LogRetentionDays artık otomatik OLUŞTURULMAZ. Eğer DB'de yoksa default (15) döner ama DB'ye yazmaz.
-                LogRetentionDays = GetInt(db, "LogRetentionDays", 15, false);
+                LogRetentionDays = GetInt(db, "LogRetentionDays", 15);
             }
             catch (Exception ex)
             {

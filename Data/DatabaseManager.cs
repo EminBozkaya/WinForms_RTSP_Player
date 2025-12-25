@@ -196,7 +196,6 @@ namespace WinForms_RTSP_Player.Data
                 // Kayıt Gösterim Limitleri
                 AddSystemParameter("GetAccessLogLimit", "3000", "Araç Giriş-Çıkış Kayıt Gösterim Limiti (adet)");
                 AddSystemParameter("GetSystemLogLimit", "3000", "Sistem Kayıt Gösterim Limiti (adet)");
-                AddSystemParameter("LogDisplayDays", "3", "Geçmiş Log Gösterim Son Gün Sayısı  (gün)");
 
                 // Erişim Karar Parametreleri
                 AddSystemParameter("UNAUTHORIZED_COOLDOWN_SECONDS", "60", "Kayıtsız Aynı Araç Log Kaydı Bekleme Süresi (saniye)");

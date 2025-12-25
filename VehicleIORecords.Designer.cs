@@ -29,6 +29,11 @@ namespace WinForms_RTSP_Player
             this.cmbTypeFilter = new System.Windows.Forms.ComboBox();
             this.lblAuthFilter = new System.Windows.Forms.Label();
             this.cmbAuthFilter = new System.Windows.Forms.ComboBox();
+            this.lblStartDate = new System.Windows.Forms.Label();
+            this.dtpStart = new System.Windows.Forms.DateTimePicker();
+            this.lblEndDate = new System.Windows.Forms.Label();
+            this.dtpEnd = new System.Windows.Forms.DateTimePicker();
+            this.btnFetchLogs = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewLogs)).BeginInit();
             this.panelButtons.SuspendLayout();
             this.SuspendLayout();
@@ -65,6 +70,11 @@ namespace WinForms_RTSP_Player
             // panelFilters
             // 
             this.panelFilters.BackColor = System.Drawing.Color.White;
+            this.panelFilters.Controls.Add(this.btnFetchLogs);
+            this.panelFilters.Controls.Add(this.dtpEnd);
+            this.panelFilters.Controls.Add(this.lblEndDate);
+            this.panelFilters.Controls.Add(this.dtpStart);
+            this.panelFilters.Controls.Add(this.lblStartDate);
             this.panelFilters.Controls.Add(this.cmbAuthFilter);
             this.panelFilters.Controls.Add(this.lblAuthFilter);
             this.panelFilters.Controls.Add(this.cmbTypeFilter);
@@ -74,7 +84,7 @@ namespace WinForms_RTSP_Player
             this.panelFilters.Dock = System.Windows.Forms.DockStyle.Top;
             this.panelFilters.Location = new System.Drawing.Point(0, 0);
             this.panelFilters.Name = "panelFilters";
-            this.panelFilters.Size = new System.Drawing.Size(634, 60);
+            this.panelFilters.Size = new System.Drawing.Size(634, 75);
             this.panelFilters.TabIndex = 2;
             // 
             // lblPlateFilter
@@ -131,6 +141,55 @@ namespace WinForms_RTSP_Player
             this.cmbAuthFilter.Size = new System.Drawing.Size(100, 21);
             this.cmbAuthFilter.TabIndex = 5;
             this.cmbAuthFilter.SelectedIndexChanged += new System.EventHandler(this.FilterControl_Changed);
+            // 
+            // lblStartDate
+            // 
+            this.lblStartDate.AutoSize = true;
+            this.lblStartDate.Location = new System.Drawing.Point(385, 12);
+            this.lblStartDate.Name = "lblStartDate";
+            this.lblStartDate.Size = new System.Drawing.Size(56, 13);
+            this.lblStartDate.TabIndex = 6;
+            this.lblStartDate.Text = "Başlangıç:";
+            // 
+            // dtpStart
+            // 
+            this.dtpStart.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dtpStart.Location = new System.Drawing.Point(385, 28);
+            this.dtpStart.Name = "dtpStart";
+            this.dtpStart.Size = new System.Drawing.Size(85, 20);
+            this.dtpStart.TabIndex = 7;
+            // 
+            // lblEndDate
+            // 
+            this.lblEndDate.AutoSize = true;
+            this.lblEndDate.Location = new System.Drawing.Point(480, 12);
+            this.lblEndDate.Name = "lblEndDate";
+            this.lblEndDate.Size = new System.Drawing.Size(29, 13);
+            this.lblEndDate.TabIndex = 8;
+            this.lblEndDate.Text = "Bitiş:";
+            // 
+            // dtpEnd
+            // 
+            this.dtpEnd.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dtpEnd.Location = new System.Drawing.Point(480, 28);
+            this.dtpEnd.Name = "dtpEnd";
+            this.dtpEnd.Size = new System.Drawing.Size(85, 20);
+            this.dtpEnd.TabIndex = 9;
+            // 
+            // btnFetchLogs
+            // 
+            this.btnFetchLogs.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(46)))), ((int)(((byte)(204)))), ((int)(((byte)(113)))));
+            this.btnFetchLogs.FlatAppearance.BorderSize = 0;
+            this.btnFetchLogs.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnFetchLogs.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnFetchLogs.ForeColor = System.Drawing.Color.White;
+            this.btnFetchLogs.Location = new System.Drawing.Point(575, 12);
+            this.btnFetchLogs.Name = "btnFetchLogs";
+            this.btnFetchLogs.Size = new System.Drawing.Size(55, 41);
+            this.btnFetchLogs.TabIndex = 10;
+            this.btnFetchLogs.Text = "Listeyi Getir";
+            this.btnFetchLogs.UseVisualStyleBackColor = false;
+            this.btnFetchLogs.Click += new System.EventHandler(this.btnFetchLogs_Click);
             // 
             // btnDelete
             // 
@@ -211,5 +270,10 @@ namespace WinForms_RTSP_Player
         private System.Windows.Forms.ComboBox cmbTypeFilter;
         private System.Windows.Forms.Label lblAuthFilter;
         private System.Windows.Forms.ComboBox cmbAuthFilter;
+        private System.Windows.Forms.Label lblStartDate;
+        private System.Windows.Forms.DateTimePicker dtpStart;
+        private System.Windows.Forms.Label lblEndDate;
+        private System.Windows.Forms.DateTimePicker dtpEnd;
+        private System.Windows.Forms.Button btnFetchLogs;
     }
 }

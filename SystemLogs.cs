@@ -18,6 +18,11 @@ namespace WinForms_RTSP_Player
             {
                 InitializeComponent();
                 _dbManager = DatabaseManager.Instance;
+                
+                // Tarih aralığını ayarla (Varsayılan N gün öncesinden bugüne)
+                dtpStart.Value = DateTime.Now.Date.AddDays(-SystemParameters.LogDisplayDays);
+                dtpEnd.Value = DateTime.Now;
+
                 InitializeFilters();
                 LoadSystemLogs();
                 
@@ -36,9 +41,11 @@ namespace WinForms_RTSP_Player
         {
             try
             {
-                DataTable dt = _dbManager.GetSystemLog(SystemParameters.GetSystemLogLimit); // Get last N records from parameters
+                // Artık zaman bazlı getiriyoruz
+                DataTable dt = _dbManager.GetSystemLog(dtpStart.Value, dtpEnd.Value);
                 dataGridViewLogs.DataSource = dt;
                 FormatGrid();
+                ApplyFilters(); // Tablo yenilendiğinde mevcut UI filtrelerini tekrar uygula
             }
             catch (Exception ex)
             {
@@ -174,6 +181,12 @@ namespace WinForms_RTSP_Player
             prompt.CancelButton = cancel;
 
             return prompt.ShowDialog() == DialogResult.OK ? textBox.Text : null;
+        }
+
+        private void btnFetchLogs_Click(object sender, EventArgs e)
+        {
+            LoadSystemLogs();
+            DatabaseManager.Instance.LogSystem("INFO", $"Sistem kayıtları tarih aralığına göre getirildi: {dtpStart.Value.ToShortDateString()} - {dtpEnd.Value.ToShortDateString()}", "SystemLogs.btnFetchLogs_Click");
         }
 
         private void btnRefresh_Click(object sender, EventArgs e)

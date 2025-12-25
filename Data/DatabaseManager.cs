@@ -182,27 +182,29 @@ namespace WinForms_RTSP_Player.Data
             {
                 // Standart Parametreler ve değerleri:
                 // Kamera & Akış Ayarları (DB'de saniye olarak saklanır)
-                AddSystemParameter("FrameCaptureTimerInterval", "1", "Görüntü Yakalama Zaman Aralığı (saniye)");
-                AddSystemParameter("StreamHealthTimerInterval", "30", "Kamera Yayın Görüntü Kontrol Zaman Aralığı (saniye)");
-                AddSystemParameter("HeartbeatTimerInterval", "300", "Sistem Sağlığı Kontrol Zaman Aralığı (saniye)");
-                AddSystemParameter("PeriodicResetTimerInterval", "600", "Görüntü Yeniden Başlatma Zaman Aralığı (saniye)");
-                AddSystemParameter("PlateMinimumLength", "7", "Minimum Plaka Karakter Sayısı");
-                AddSystemParameter("FrameKontrolInterval", "10", "Kamera Frame Kontrol Zaman Aralığı (saniye)");
+                AddSystemParameter("FrameCaptureTimerInterval", "2", "Görüntü Yakalama Zaman Aralığı (saniye)");
+                AddSystemParameter("StreamHealthTimerInterval", "5", "Kamera Yayın Görüntü Kontrol Zaman Aralığı (saniye)");
+                AddSystemParameter("HeartbeatTimerInterval", "60", "Sistem Sağlığı Kontrol Zaman Aralığı (saniye)");
+                AddSystemParameter("PeriodicResetTimerInterval", "7200", "Görüntü Yeniden Başlatma Zaman Aralığı (saniye)");
+                AddSystemParameter("PlateMinimumLength", "6", "Minimum Plaka Karakter Sayısı");
+                AddSystemParameter("FrameKontrolInterval", "6", "Kamera Frame Kontrol Zaman Aralığı (saniye)");
 
                 // UI Gösterim Süreleri (DB'de saniye olarak saklanır)
                 AddSystemParameter("AuthorizedPlateShowTime", "45", "Kayıtlı Araç Plaka Gösterim Süresi (saniye)");
                 AddSystemParameter("UnAuthorizedPlateShowTime", "10", "Kayıtsız Araç Plaka Gösterim Süresi (saniye)");
 
                 // Kayıt Gösterim Limitleri
-                AddSystemParameter("GetAccessLogLimit", "1000", "Araç Giriş-Çıkış Kayıt Gösterim Limiti (adet)");
-                AddSystemParameter("GetSystemLogLimit", "1000", "Sistem Kayıt Gösterim Limiti (adet)");
+                AddSystemParameter("GetAccessLogLimit", "3000", "Araç Giriş-Çıkış Kayıt Gösterim Limiti (adet)");
+                AddSystemParameter("GetSystemLogLimit", "3000", "Sistem Kayıt Gösterim Limiti (adet)");
+                AddSystemParameter("LogDisplayDays", "3", "Geçmiş Log Gösterim Son Gün Sayısı  (gün)");
 
                 // Erişim Karar Parametreleri
                 AddSystemParameter("UNAUTHORIZED_COOLDOWN_SECONDS", "60", "Kayıtsız Aynı Araç Log Kaydı Bekleme Süresi (saniye)");
                 AddSystemParameter("GATE_LOCK_SECONDS", "45", "Kapı Açılma Bekleme Süresi (saniye)");
                 AddSystemParameter("CROSS_DIRECTION_COOLDOWN_SECONDS", "45", "Aynı Araç Giriş-Çıkış Bekleme Süresi (saniye)");
-                AddSystemParameter("AuthorizedConfidenceThreshold", "70", "Kayıtlı Araç Plaka Okuma Doğruluk Eşiği (%)");
+                AddSystemParameter("AuthorizedConfidenceThreshold", "65", "Kayıtlı Araç Plaka Okuma Doğruluk Eşiği (%)");
                 AddSystemParameter("UnAuthorizedConfidenceThreshold", "75", "Kayıtsız Araç Plaka Okuma Doğruluk Eşiği (%)");
+                AddSystemParameter("LogRetentionDays", "15", "Logların Saklanacağı Gün Sayısı (gün)");
             }
             catch (Exception ex)
             {
@@ -816,21 +818,41 @@ namespace WinForms_RTSP_Player.Data
             }
         }
 
-        public DataTable GetAccessLog(int limit = 1000)
+        public DataTable GetAccessLog(DateTime? startDate = null, DateTime? endDate = null)
         {
             try
             {
                 using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = $"SELECT * FROM AccessLog ORDER BY AccessTime DESC LIMIT {limit}";
+                    string query = "SELECT * FROM AccessLog";
+                    
+                    if (startDate.HasValue && endDate.HasValue)
+                    {
+                        query += " WHERE AccessTime >= @Start AND AccessTime <= @End";
+                    }
+                    else
+                    {
+                        // Limit fallback if no range
+                        query += " LIMIT 1000";
+                    }
+                    
+                    query += " ORDER BY AccessTime DESC";
 
                     using (var command = new SqliteCommand(query, connection))
-                    using (var reader = command.ExecuteReader())
                     {
-                        var dataTable = new DataTable();
-                        dataTable.Load(reader);
-                        return dataTable;
+                        if (startDate.HasValue && endDate.HasValue)
+                        {
+                            command.Parameters.AddWithValue("@Start", startDate.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+                            command.Parameters.AddWithValue("@End", endDate.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+                        }
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            var dataTable = new DataTable();
+                            dataTable.Load(reader);
+                            return dataTable;
+                        }
                     }
                 }
             }
@@ -890,21 +912,41 @@ namespace WinForms_RTSP_Player.Data
             }
         }
 
-        public DataTable GetSystemLog(int limit = 1000)
+        public DataTable GetSystemLog(DateTime? startDate = null, DateTime? endDate = null)
         {
             try
             {
                 using (var connection = new SqliteConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = $"SELECT * FROM SystemLog ORDER BY LogTime DESC LIMIT {limit}";
+                    string query = "SELECT * FROM SystemLog";
+
+                    if (startDate.HasValue && endDate.HasValue)
+                    {
+                        query += " WHERE LogTime >= @Start AND LogTime <= @End";
+                    }
+                    else
+                    {
+                        // Limit fallback if no range
+                        query += " LIMIT 1000";
+                    }
+
+                    query += " ORDER BY LogTime DESC";
 
                     using (var command = new SqliteCommand(query, connection))
-                    using (var reader = command.ExecuteReader())
                     {
-                        var dataTable = new DataTable();
-                        dataTable.Load(reader);
-                        return dataTable;
+                        if (startDate.HasValue && endDate.HasValue)
+                        {
+                            command.Parameters.AddWithValue("@Start", startDate.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+                            command.Parameters.AddWithValue("@End", endDate.Value.ToString("yyyy-MM-dd HH:mm:ss"));
+                        }
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            var dataTable = new DataTable();
+                            dataTable.Load(reader);
+                            return dataTable;
+                        }
                     }
                 }
             }

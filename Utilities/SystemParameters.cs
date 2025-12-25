@@ -11,11 +11,11 @@ namespace WinForms_RTSP_Player.Utilities
     {
         // Kamera & Akış Ayarları (ms cinsinden kullanılır, DB'de saniye olarak saklanır)
         public static int FrameCaptureTimerInterval { get; private set; } = 1000; //1 sn - Görüntü Yakalama Zaman Aralığı
-        public static int StreamHealthTimerInterval { get; private set; } = 30000; //30 sn - Kamera Yayın Görüntü Kontrol Zaman Aralığı
-        public static int HeartbeatTimerInterval { get; private set; } = 300000; //5 dk - Sistem Sağlığı Kontrol Zaman Aralığı
-        public static int PeriodicResetTimerInterval { get; private set; } = 600000; //10 dk - Görüntü Yeniden Başlatma Zaman Aralığı
+        public static int StreamHealthTimerInterval { get; private set; } = 5000; //5 sn - Kamera Yayın Görüntü Kontrol Zaman Aralığı
+        public static int HeartbeatTimerInterval { get; private set; } = 60000; //1 dk - Sistem Sağlığı Kontrol Zaman Aralığı
+        public static int PeriodicResetTimerInterval { get; private set; } = 7200000; //2 saat - Görüntü Yeniden Başlatma Zaman Aralığı
         public static int PlateMinimumLength { get; private set; } = 7; // Minimum Plaka Karakter Sayısı (TR için)
-        public static int FrameKontrolInterval { get; private set; } = 10; //10 sn - Kamera Frame Kontrol Zaman Aralığı
+        public static int FrameKontrolInterval { get; private set; } = 6; //6 sn - Kamera Frame Kontrol Zaman Aralığı
 
         // UI Gösterim Süreleri (ms cinsinden kullanılır, DB'de saniye olarak saklanır)
         public static int AuthorizedPlateShowTime { get; private set; } = 45000; //45 sn - Kayıtlı Araç Plaka Gösterim Süresi

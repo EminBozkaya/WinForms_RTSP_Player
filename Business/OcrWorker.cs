@@ -46,6 +46,9 @@ namespace WinForms_RTSP_Player.Business
             _workerThread.Start();
             
             DatabaseManager.Instance.LogSystem("INFO", "OCR Worker başlatıldı.", "OcrWorker.Constructor");
+#if DEBUG
+            Console.WriteLine($"[{DateTime.Now}] [INFO] OCR Worker başlatıldı. - OcrWorker.Constructor");
+#endif
         }
 
         public void Enqueue(OcrJob job)
@@ -62,6 +65,9 @@ namespace WinForms_RTSP_Player.Business
                 DatabaseManager.Instance.LogSystem("WARNING", 
                     "OCR Kuyruğu taştı, temizlendi.", 
                     "OcrWorker.Enqueue");
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [WARNING] OCR Kuyruğu taştı, temizlendi. - OcrWorker.Enqueue");
+#endif
             }
 
             _queue.Enqueue(job);
@@ -96,6 +102,9 @@ namespace WinForms_RTSP_Player.Business
                         "OCR Worker Loop Hatası", 
                         "OcrWorker.ProcessLoop", 
                         ex.ToString());
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] OCR Worker Loop Hatası - OcrWorker.ProcessLoop - {ex.Message}");
+#endif
                 }
             }
         }
@@ -154,6 +163,9 @@ namespace WinForms_RTSP_Player.Business
                     $"OCR İşleme Hatası: {job.CameraId}", 
                     "OcrWorker.ProcessJob", 
                     ex.ToString());
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] OCR İşleme Hatası: {job.CameraId} - OcrWorker.ProcessJob - {ex.Message}");
+#endif
             }
             finally
             {
@@ -184,6 +196,9 @@ namespace WinForms_RTSP_Player.Business
             
             _signal.Dispose();
             DatabaseManager.Instance.LogSystem("INFO", "OCR Worker kapatıldı.", "OcrWorker.Dispose");
+#if DEBUG
+            Console.WriteLine($"[{DateTime.Now}] [INFO] OCR Worker kapatıldı. - OcrWorker.Dispose");
+#endif
         }
     }
 }

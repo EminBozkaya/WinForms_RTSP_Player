@@ -55,6 +55,10 @@ namespace WinForms_RTSP_Player.Business
         private int _heartbeatInterval;
         private int _periodicResetInterval;
 
+        private int _reconnectAttempts = 0;
+        private const int MAX_RECONNECT_ATTEMPTS = 3;
+        private DateTime _lastReconnectTime = DateTime.MinValue;
+
         public CameraWorker(string cameraId, string rtspUrl, string direction, VideoView videoView = null)
         {
             CameraId = cameraId ?? throw new ArgumentNullException(nameof(cameraId));
@@ -74,6 +78,10 @@ namespace WinForms_RTSP_Player.Business
             DatabaseManager.Instance.LogSystem("INFO", 
                 $"CameraWorker oluşturuldu: {CameraId} ({Direction})", 
                 $"CameraWorker.{CameraId}.Constructor");
+
+#if DEBUG
+            Console.WriteLine($"[{DateTime.Now}] [INFO] CameraWorker oluşturuldu: {CameraId} ({Direction})");
+#endif
         }
 
         // OCR Worker'dan gelen sonucu yakala ve bu kameraya aitse işle
@@ -90,6 +98,9 @@ namespace WinForms_RTSP_Player.Business
                     DatabaseManager.Instance.LogSystem("WARNING", 
                         $"OCR Sonucu Gecikmeli (Drift: {latency:F1}s) - İŞLENMEDİ: {e.Plate}", 
                         $"CameraWorker.{CameraId}.OcrWorker_PlateDetected");
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [WARNING] OCR Sonucu Gecikmeli (Drift: {latency:F1}s) - İŞLENMEDİ: {e.Plate} - CameraWorker.{CameraId}.OcrWorker_PlateDetected");
+#endif
                     return;
                 }
 
@@ -107,6 +118,9 @@ namespace WinForms_RTSP_Player.Business
                 DatabaseManager.Instance.LogSystem("WARNING", 
                     $"Kamera zaten çalışıyor: {CameraId}", 
                     $"CameraWorker.{CameraId}.Start");
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [WARNING] Kamera zaten çalışıyor: {CameraId} - CameraWorker.{CameraId}.Start");
+#endif
                 return;
             }
 
@@ -150,6 +164,9 @@ namespace WinForms_RTSP_Player.Business
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"Kamera başlatıldı: {CameraId} ({Direction})", 
                     $"CameraWorker.{CameraId}.Start");
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera başlatıldı: {CameraId} ({Direction}) - CameraWorker.{CameraId}.Start");
+#endif
             }
             catch (Exception ex)
             {
@@ -158,6 +175,9 @@ namespace WinForms_RTSP_Player.Business
                     $"Kamera başlatma hatası: {CameraId}", 
                     $"CameraWorker.{CameraId}.Start", 
                     ex.ToString());
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Kamera başlatma hatası: {CameraId} - CameraWorker.{CameraId}.Start - {ex.Message}");
+#endif
             }
         }
 
@@ -214,6 +234,9 @@ namespace WinForms_RTSP_Player.Business
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"Kamera durduruldu: {CameraId}", 
                     $"CameraWorker.{CameraId}.Stop");
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera durduruldu: {CameraId} - CameraWorker.{CameraId}.Stop");
+#endif
             }
             catch (Exception ex)
             {
@@ -221,6 +244,9 @@ namespace WinForms_RTSP_Player.Business
                     $"Kamera durdurma hatası: {CameraId}", 
                     $"CameraWorker.{CameraId}.Stop", 
                     ex.ToString());
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Kamera durdurma hatası: {CameraId} - CameraWorker.{CameraId}.Stop - {ex.Message}");
+#endif
             }
         }
 
@@ -266,6 +292,9 @@ namespace WinForms_RTSP_Player.Business
                         $"VLC Kritik Hata: {e.Message}", 
                         $"CameraWorker.{CameraId}.VLCInternal", 
                         e.Module);
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] VLC Kritik Hata: {e.Message} - CameraWorker.{CameraId}.VLCInternal - Module: {e.Module}");
+#endif
                 }
             };
 
@@ -293,6 +322,9 @@ namespace WinForms_RTSP_Player.Business
             DatabaseManager.Instance.LogSystem("INFO", 
                 $"VLC başlatıldı: {CameraId}", 
                 $"CameraWorker.{CameraId}.InitializeVLC");
+#if DEBUG
+            Console.WriteLine($"[{DateTime.Now}] [INFO] VLC başlatıldı: {CameraId} - CameraWorker.{CameraId}.InitializeVLC");
+#endif
         }
 
         private void InitializeTimers()
@@ -310,10 +342,32 @@ namespace WinForms_RTSP_Player.Business
             DatabaseManager.Instance.LogSystem("INFO", 
                 $"Threading Timers başlatıldı: {CameraId}", 
                 $"CameraWorker.{CameraId}.InitializeTimers");
+#if DEBUG
+            Console.WriteLine($"[{DateTime.Now}] [INFO] Threading Timers başlatıldı: {CameraId} - CameraWorker.{CameraId}.InitializeTimers");
+#endif
         }
 
         private void PeriodicResetTimer_Tick(object state)
         {
+            // ====== YENİ: CONDITIONAL RESET ======
+
+            // Eğer son 5 dakikada hiç reconnect yoksa, reset'e gerek yok
+            var timeSinceLastReconnect = (DateTime.Now - _lastReconnectTime).TotalMinutes;
+
+            if (timeSinceLastReconnect > 30) // 30 dakika sorunsuz çalıştıysa
+            {
+                DatabaseManager.Instance.LogSystem("INFO",
+                    $"Sistem {timeSinceLastReconnect:F0} dakikadır stabil. Periodic reset atlanıyor: {CameraId}",
+                    $"CameraWorker.{CameraId}.PeriodicResetTimer_Tick");
+
+                return; // Reset yapma
+            }
+
+            // Eğer son 30 dakikada reconnect olduysa, reset yap
+            DatabaseManager.Instance.LogSystem("INFO",
+                $"Son {timeSinceLastReconnect:F0} dakikada reconnect oldu. Preventive reset: {CameraId}",
+                $"CameraWorker.{CameraId}.PeriodicResetTimer_Tick");
+
             Restart();
         }
 
@@ -338,6 +392,9 @@ namespace WinForms_RTSP_Player.Business
                 DatabaseManager.Instance.LogSystem("INFO",
                     $"Kamera periyodik olarak resetleniyor (Gecikme önleme)",
                     $"CameraWorker.{CameraId}.Restart");
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] Kamera periyodik olarak resetleniyor (Gecikme önleme) - CameraWorker.{CameraId}.Restart");
+#endif
 
                 Stop();
 
@@ -351,6 +408,9 @@ namespace WinForms_RTSP_Player.Business
                     $"Restart hatası: {CameraId}",
                     $"CameraWorker.{CameraId}.Restart",
                     ex.ToString());
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] Restart hatası: {CameraId} - CameraWorker.{CameraId}.Restart - {ex.Message}");
+#endif
             }
             finally
             {
@@ -425,6 +485,9 @@ namespace WinForms_RTSP_Player.Business
                         $"Snapshot Kuyruklama Hatası: {CameraId}", 
                         $"CameraWorker.{CameraId}.FrameCaptureTimer_Tick", 
                         ex.ToString());
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] Snapshot Kuyruklama Hatası: {CameraId} - CameraWorker.{CameraId}.FrameCaptureTimer_Tick - {ex.Message}");
+#endif
                 }
                 // Finally bloğuna gerek yok, delete işlemi try içinde yapıldı.
                 // Eğer hata olursa dosya kalabilir, ama unique isim olduğu için sorun olmaz.
@@ -448,77 +511,225 @@ namespace WinForms_RTSP_Player.Business
                     return;
 
                 var state = _mediaPlayer.State;
-                
-                if (state == VLCState.Stopped || state == VLCState.Error || state == VLCState.Ended)
+
+                // ====== YENİ: STATE-SPECIFIC HANDLING ======
+
+                if (state == VLCState.Error)
                 {
-                    DatabaseManager.Instance.LogSystem("WARNING", 
-                        $"Kamera bağlantısı kesildi (State: {state}). Yeniden bağlanılıyor: {CameraId}", 
+                    // Error state: Hemen restart
+                    DatabaseManager.Instance.LogSystem("ERROR",
+                        $"VLC Error State tespit edildi. Hemen restart: {CameraId}",
                         $"CameraWorker.{CameraId}.CheckStreamHealth");
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] VLC Error State tespit edildi. Hemen restart: {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth");
+#endif
+
+                    Restart(); // AttemptReconnect yerine direkt Restart
+                    return;
+                }
+
+                if (state == VLCState.Ended)
+                {
+                    // Ended state: Stream kapandı, hemen reconnect
+                    DatabaseManager.Instance.LogSystem("WARNING",
+                        $"Stream Ended (Kamera bağlantısı koptu). Reconnect: {CameraId}",
+                        $"CameraWorker.{CameraId}.CheckStreamHealth");
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [WARNING] Stream Ended (Kamera bağlantısı koptu). Reconnect: {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth");
+#endif
 
                     AttemptReconnect();
                     return;
                 }
 
-                // FIRST FRAME GUARD
-                // Eğer açılıştan beri 8 saniye geçti ve hala hiç frame gelmediyse, resetle.
-                if (!_firstFrameReceived && (DateTime.Now - _startTime).TotalSeconds > 8)
+                if (state == VLCState.Stopped)
                 {
-                    DatabaseManager.Instance.LogSystem("WARNING", 
-                        $"İlk açılışta görüntü gelmedi (8sn First Frame Guard). Resetleniyor: {CameraId}", 
-                        $"CameraWorker.{CameraId}.CheckStreamHealth");
+                    // Stopped state: Ne zamandır stopped?
+                    var stoppedDuration = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
 
-                    AttemptReconnect();
+                    if (stoppedDuration > 5)
+                    {
+                        DatabaseManager.Instance.LogSystem("WARNING",
+                            $"Stream Stopped {stoppedDuration:F1}s. Reconnect: {CameraId}",
+                            $"CameraWorker.{CameraId}.CheckStreamHealth");
+#if DEBUG
+                        Console.WriteLine($"[{DateTime.Now}] [WARNING] Stream Stopped {stoppedDuration:F1}s. Reconnect: {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth");
+#endif
+
+                        AttemptReconnect();
+                        return;
+                    }
+                }
+
+                // ====== FIRST FRAME GUARD (İYİLEŞTİRİLMİŞ) ======
+                if (!_firstFrameReceived && (DateTime.Now - _startTime).TotalSeconds > 10) // 8 -> 10
+                {
+                    DatabaseManager.Instance.LogSystem("ERROR",
+                        $"10 saniye içinde ilk frame gelmedi. FULL RESTART: {CameraId}",
+                        $"CameraWorker.{CameraId}.CheckStreamHealth");
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] 10 saniye içinde ilk frame gelmedi. FULL RESTART: {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth");
+#endif
+
+                    Restart(); // AttemptReconnect yerine Restart
                     return;
                 }
 
+                // ====== FRAME FREEZE GUARD (İYİLEŞTİRİLMİŞ) ======
                 var secondsSinceLastFrame = (DateTime.Now - _lastVideoUpdateTime).TotalSeconds;
 
-                if (secondsSinceLastFrame > SystemParameters.FrameKontrolInterval) 
+                if (secondsSinceLastFrame > SystemParameters.FrameKontrolInterval)
                 {
-                    DatabaseManager.Instance.LogSystem("WARNING", 
-                        $"Frame akışı {secondsSinceLastFrame:F1} sn durdu (State: {state}). Yeniden bağlanılıyor: {CameraId}", 
-                        $"CameraWorker.{CameraId}.CheckStreamHealth");
+                    // ====== YENİ: PROGRESSIVE RECOVERY ======
 
-                    AttemptReconnect();
+                    if (secondsSinceLastFrame > 20)
+                    {
+                        // 20+ saniye donma: Ciddi sorun, full restart
+                        DatabaseManager.Instance.LogSystem("ERROR",
+                            $"Frame akışı {secondsSinceLastFrame:F1}s durdu (CRİTİCAL). FULL RESTART: {CameraId}",
+                            $"CameraWorker.{CameraId}.CheckStreamHealth");
+#if DEBUG
+                        Console.WriteLine($"[{DateTime.Now}] [ERROR] Frame akışı {secondsSinceLastFrame:F1}s durdu (CRİTİCAL). FULL RESTART: {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth");
+#endif
+
+                        Restart();
+                    }
+                    else if (secondsSinceLastFrame > SystemParameters.FrameKontrolInterval)
+                    {
+                        // 6-20 saniye arası: Önce reconnect dene
+                        DatabaseManager.Instance.LogSystem("WARNING",
+                            $"Frame akışı {secondsSinceLastFrame:F1}s durdu. Reconnect: {CameraId}",
+                            $"CameraWorker.{CameraId}.CheckStreamHealth");
+#if DEBUG
+                        Console.WriteLine($"[{DateTime.Now}] [WARNING] Frame akışı {secondsSinceLastFrame:F1}s durdu. Reconnect: {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth");
+#endif
+
+                        AttemptReconnect();
+                    }
+                }
+
+                // ====== YENİ: PROACTIVE HEALTH CHECK ======
+                // Playing ama frame rate düşükse uyar
+                if (state == VLCState.Playing && secondsSinceLastFrame > 3 && secondsSinceLastFrame < SystemParameters.FrameKontrolInterval)
+                {
+                    //DatabaseManager.Instance.LogSystem("INFO",
+                    //    $"Frame rate düşük: {secondsSinceLastFrame:F1}s (Playing ama yavaş) - {CameraId}",
+                    //    $"CameraWorker.{CameraId}.CheckStreamHealth");
+
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [INFO] Frame rate düşük: {secondsSinceLastFrame:F1}s (Playing ama yavaş) - {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth");
+#endif
                 }
             }
             catch (Exception ex)
             {
-                DatabaseManager.Instance.LogSystem("ERROR", 
-                    $"Sağlık kontrolü hatası: {CameraId}", 
-                    $"CameraWorker.{CameraId}.CheckStreamHealth", 
+                DatabaseManager.Instance.LogSystem("ERROR",
+                    $"Sağlık kontrolü hatası: {CameraId}",
+                    $"CameraWorker.{CameraId}.CheckStreamHealth",
                     ex.ToString());
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Sağlık kontrolü hatası: {CameraId} - CameraWorker.{CameraId}.CheckStreamHealth - {ex.Message}");
+#endif
             }
         }
 
         private void AttemptReconnect()
         {
-            // Double-Check Locking (Paranoyak Seviye Güvenlik)
             if (_isResetting) return;
+            // ====== YENİ: RETRY LIMITER ======
+            var timeSinceLastReconnect = (DateTime.Now - _lastReconnectTime).TotalSeconds;
+
+            if (timeSinceLastReconnect < 5)
+            {
+                _reconnectAttempts++;
+
+                if (_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS)
+                {
+                    DatabaseManager.Instance.LogSystem("WARNING",
+                        $"3 kez reconnect başarısız. Full restart yapılıyor: {CameraId}",
+                        $"CameraWorker.{CameraId}.AttemptReconnect");
+
+                    _reconnectAttempts = 0;
+                    Restart();
+                    return;
+                }
+            }
+            else
+            {
+                _reconnectAttempts = 0; // Reset counter
+            }
+
+            _lastReconnectTime = DateTime.Now;
 
             lock (_playerLock)
             {
                 if (_isResetting) return;
-                
+
                 try
                 {
                     if (_mediaPlayer == null) return;
 
+                    // ====== ESKİ KOD ======
+                    // _mediaPlayer.Stop();
+                    // Thread.Sleep(500);
+                    // _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
+
+                    // ====== YENİ KOD: DAHA AGRESIF RECONNECT ======
+
+                    // 1. Önce media'yı temizle
+                    var currentMedia = _mediaPlayer.Media;
+                    currentMedia?.Dispose();
+
+                    // 2. Stop çağır
                     _mediaPlayer.Stop();
-                    Thread.Sleep(500); 
-                    _mediaPlayer.Play(new Media(_libVLC, _rtspUrl, FromType.FromLocation, ":avcodec-hw=none"));
+
+                    // 3. Kameraya nefes aldır (CAM_OUT için daha uzun)
+                    int waitTime = (CameraId == "CAM_OUT") ? 2000 : 1000;
+                    Thread.Sleep(waitTime);
+
+                    // 4. Yeni media oluştur
+                    var newMedia = new Media(_libVLC, _rtspUrl, FromType.FromLocation,
+                        ":avcodec-hw=none",
+                        ":network-caching=" + ((CameraId == "CAM_OUT") ? "3000" : "1000")
+                    );
+
+                    // 5. Play
+                    _mediaPlayer.Play(newMedia);
                     _lastVideoUpdateTime = DateTime.Now;
 
-                    DatabaseManager.Instance.LogSystem("INFO", 
-                        $"RTSP yeniden başlatıldı: {CameraId}", 
+                    DatabaseManager.Instance.LogSystem("INFO",
+                        $"RTSP yeniden başlatıldı (Enhanced): {CameraId}",
                         $"CameraWorker.{CameraId}.AttemptReconnect");
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [INFO] RTSP yeniden başlatıldı (Enhanced): {CameraId} - CameraWorker.{CameraId}.AttemptReconnect");
+#endif
                 }
                 catch (Exception ex)
                 {
-                    DatabaseManager.Instance.LogSystem("ERROR", 
-                        $"Yeniden bağlantı hatası: {CameraId}", 
-                        $"CameraWorker.{CameraId}.AttemptReconnect", 
+                    DatabaseManager.Instance.LogSystem("ERROR",
+                        $"Yeniden bağlantı hatası: {CameraId}",
+                        $"CameraWorker.{CameraId}.AttemptReconnect",
                         ex.ToString());
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] Yeniden bağlantı hatası: {CameraId} - CameraWorker.{CameraId}.AttemptReconnect - {ex.Message}");
+#endif
+
+                    // ====== YENİ: FALLBACK MEKANIZMASI ======
+                    // Eğer reconnect de başarısız olursa, tam restart yap
+                    Task.Run(() =>
+                    {
+                        Thread.Sleep(3000);
+                        if (!IsRunning) return;
+
+                        DatabaseManager.Instance.LogSystem("WARNING",
+                            $"Reconnect başarısız, full restart başlatılıyor: {CameraId}",
+                            $"CameraWorker.{CameraId}.AttemptReconnect");
+#if DEBUG
+                        Console.WriteLine($"[{DateTime.Now}] [WARNING] Reconnect başarısız, full restart başlatılıyor: {CameraId} - CameraWorker.{CameraId}.AttemptReconnect");
+#endif
+
+                        Restart();
+                    });
                 }
             }
         }
@@ -541,6 +752,9 @@ namespace WinForms_RTSP_Player.Business
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"Heartbeat: {CameraId} ({Direction}) - {status} - {frameInfo}", 
                     $"CameraWorker.{CameraId}.Heartbeat");
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] Heartbeat: {CameraId} ({Direction}) - {status} - {frameInfo} - CameraWorker.{CameraId}.Heartbeat");
+#endif
             }
             catch (Exception ex)
             {
@@ -548,6 +762,9 @@ namespace WinForms_RTSP_Player.Business
                     $"Heartbeat hatası: {CameraId}", 
                     $"CameraWorker.{CameraId}.Heartbeat", 
                     ex.ToString());
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Heartbeat hatası: {CameraId} - CameraWorker.{CameraId}.Heartbeat - {ex.Message}");
+#endif
             }
         }
 
@@ -581,6 +798,9 @@ namespace WinForms_RTSP_Player.Business
                 DatabaseManager.Instance.LogSystem("INFO", 
                     $"CameraWorker dispose edildi: {CameraId}", 
                     $"CameraWorker.{CameraId}.Dispose");
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [INFO] CameraWorker dispose edildi: {CameraId} - CameraWorker.{CameraId}.Dispose");
+#endif
             }
             catch (Exception ex)
             {
@@ -588,6 +808,9 @@ namespace WinForms_RTSP_Player.Business
                     $"Dispose hatası: {CameraId}", 
                     $"CameraWorker.{CameraId}.Dispose", 
                     ex.ToString());
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Dispose hatası: {CameraId} - CameraWorker.{CameraId}.Dispose - {ex.Message}");
+#endif
             }
         }
     }

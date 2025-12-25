@@ -264,7 +264,7 @@ namespace WinForms_RTSP_Player.Business
                 "--no-video-title-show",
                 "--no-osd",
                 "--no-snapshot-preview",
-                "--vout=gdi", 
+                "--vout=win32", // Render: DirectX BYPASS
                 "--avcodec-hw=none",
                 "--clock-jitter=0",           // Jitter kontrolünü VLC'ye bırak
                 "--clock-synchro=0",

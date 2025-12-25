@@ -19,6 +19,7 @@ namespace WinForms_RTSP_Player
         {
             dataGridView1 = new DataGridView();
             btnEdit = new Button();
+            btnAdd = new Button();
             btnBack = new Button();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
             SuspendLayout();
@@ -55,6 +56,21 @@ namespace WinForms_RTSP_Player
             btnEdit.UseVisualStyleBackColor = false;
             btnEdit.Click += btnEdit_Click;
             // 
+            // btnAdd
+            // 
+            btnAdd.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnAdd.BackColor = Color.FromArgb(46, 204, 113);
+            btnAdd.FlatStyle = FlatStyle.Flat;
+            btnAdd.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnAdd.ForeColor = Color.White;
+            btnAdd.Location = new Point(618, 63);
+            btnAdd.Name = "btnAdd";
+            btnAdd.Size = new Size(120, 45);
+            btnAdd.TabIndex = 3;
+            btnAdd.Text = "Ekle";
+            btnAdd.UseVisualStyleBackColor = false;
+            btnAdd.Click += btnAdd_Click;
+            // 
             // btnBack
             // 
             btnBack.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
@@ -77,6 +93,7 @@ namespace WinForms_RTSP_Player
             BackColor = Color.FromArgb(40, 44, 52);
             ClientSize = new Size(750, 424);
             Controls.Add(btnBack);
+            Controls.Add(btnAdd);
             Controls.Add(btnEdit);
             Controls.Add(dataGridView1);
             Name = "SystemParametersForm";
@@ -91,6 +108,7 @@ namespace WinForms_RTSP_Player
 
         private System.Windows.Forms.DataGridView dataGridView1;
         private System.Windows.Forms.Button btnEdit;
+        private System.Windows.Forms.Button btnAdd;
         private System.Windows.Forms.Button btnBack;
     }
 }

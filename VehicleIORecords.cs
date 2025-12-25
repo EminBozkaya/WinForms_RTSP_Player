@@ -243,17 +243,17 @@ namespace WinForms_RTSP_Player
 
                 // Confirm deletion
                 DialogResult result = MessageBox.Show(
-                    "İki haftadan eski tüm giriş/çıkış kayıtları temizlenecek. Bu işlem geri alınamaz. Emin misiniz?",
+                    "Bir haftadan eski tüm giriş/çıkış kayıtları temizlenecek. Bu işlem geri alınamaz. Emin misiniz?",
                     "Toplu Silme Onayı",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
 
                 if (result == DialogResult.Yes)
                 {
-                    if (_dbManager.DeleteOldAccessLogs(14))
+                    if (_dbManager.DeleteOldAccessLogs(7))
                     {
                         MessageBox.Show("Eski kayıtlar başarıyla temizlendi.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        DatabaseManager.Instance.LogSystem("INFO", "İki haftadan eski giriş/çıkış kayıtları temizlendi", "VehicleIORecords.btnClearOldData_Click");
+                        DatabaseManager.Instance.LogSystem("INFO", "Bir haftadan eski giriş/çıkış kayıtları temizlendi", "VehicleIORecords.btnClearOldData_Click");
                         LoadAccessLogs(); // Refresh grid
                     }
                     else

@@ -153,7 +153,7 @@ namespace WinForms_RTSP_Player
             this.btnClearOldData.Name = "btnClearOldData";
             this.btnClearOldData.Size = new System.Drawing.Size(146, 60);
             this.btnClearOldData.TabIndex = 2;
-            this.btnClearOldData.Text = "Son iki hafta verilerinin dışındakileri temizle";
+            this.btnClearOldData.Text = "Son bir hafta verilerinin dışındakileri temizle";
             this.btnClearOldData.UseVisualStyleBackColor = false;
             this.btnClearOldData.Click += new System.EventHandler(this.btnClearOldData_Click);
             // 

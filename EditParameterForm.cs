@@ -72,7 +72,17 @@ namespace WinForms_RTSP_Player
             
             if (paramName.EndsWith("Interval") || paramName.EndsWith("Limit") || paramName.EndsWith("SECONDS") || paramName.EndsWith("Length") || paramName.EndsWith("Time"))
             {
-                if (!int.TryParse(value, out _))
+                // İstisna: FrameCaptureTimerInterval, FrameKontrolInterval ve StreamHealthTimerInterval ondalıklı olabilir
+                if (paramName == "FrameCaptureTimerInterval" || paramName == "FrameKontrolInterval" || paramName == "StreamHealthTimerInterval")
+                {
+                    if (!double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _) && 
+                        !double.TryParse(value, out _))
+                    {
+                        MessageBox.Show("Bu parametre sayısal (numeric) tipte olmalıdır.", "Validasyon Hatası", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
+                    }
+                }
+                else if (!int.TryParse(value, out _))
                 {
                     MessageBox.Show("Bu parametre tam sayı (integer) tipinde olmalıdır.", "Validasyon Hatası", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;

@@ -393,6 +393,17 @@ namespace WinForms_RTSP_Player
 
                 System.Threading.Thread.Sleep(2000);
 
+                // ====== YENİ: LOG TEMİZLEME ======
+                // Log kayıtlarını (AccessLog ve SystemLog) temizle
+                // Retention süresi SystemParameters.LogRetentionDays üzerinden dinamik olarak alınır
+                DatabaseManager.Instance.LogSystem("INFO", 
+                    $"Eski log kayıtları temizleniyor (Retention: {SystemParameters.LogRetentionDays} gün)", 
+                    "PlateRecognitionForm.MaintenanceMode");
+
+                DatabaseManager.Instance.CleanupOldLogs();
+
+                System.Threading.Thread.Sleep(1000);
+
                 // 3. Kameraları yeniden başlat
                 _cameraWorkerIN?.Start();
                 _cameraWorkerOUT?.Start();

@@ -208,17 +208,17 @@ namespace WinForms_RTSP_Player
 
                 // Confirm deletion
                 DialogResult result = MessageBox.Show(
-                    "İki haftadan eski tüm sistem kayıtları temizlenecek. Bu işlem geri alınamaz. Emin misiniz?",
+                    "Bir haftadan eski tüm sistem kayıtları temizlenecek. Bu işlem geri alınamaz. Emin misiniz?",
                     "Toplu Silme Onayı",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
 
                 if (result == DialogResult.Yes)
                 {
-                    if (_dbManager.DeleteOldSystemLogs(14))
+                    if (_dbManager.DeleteOldSystemLogs(7))
                     {
                         MessageBox.Show("Eski kayıtlar başarıyla temizlendi.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        DatabaseManager.Instance.LogSystem("INFO", "İki haftadan eski sistem kayıtları temizlendi", "SystemLogs.btnClearOldData_Click");
+                        DatabaseManager.Instance.LogSystem("INFO", "Bir haftadan eski sistem kayıtları temizlendi", "SystemLogs.btnClearOldData_Click");
                         LoadSystemLogs(); // Refresh grid
                     }
                     else

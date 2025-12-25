@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using WinForms_RTSP_Player.Utilities;
 
 namespace WinForms_RTSP_Player.Data
 {
@@ -304,7 +305,7 @@ namespace WinForms_RTSP_Player.Data
         /// <summary>
         /// Tek bir sistem parametresini döner. Kayıt yoksa, varsa verilen varsayılan değerle oluşturur.
         /// </summary>
-        public string GetSystemParameter(string parameterName, string defaultValue = null, string defaultDetail = null)
+        public string GetSystemParameter(string parameterName, string defaultValue = null, string defaultDetail = null, bool autoCreate = true)
         {
             try
             {
@@ -324,8 +325,8 @@ namespace WinForms_RTSP_Player.Data
                         }
                     }
 
-                    // Kayıt yok, default değer verilmişse otomatik oluştur
-                    if (defaultValue != null)
+                    // Kayıt yok, default değer verilmişse ve autoCreate aktifse otomatik oluştur
+                    if (defaultValue != null && autoCreate)
                     {
                         string detailToUse = defaultDetail ?? $"Otomatik oluşturulan varsayılan değer ({parameterName})";
 
@@ -354,6 +355,31 @@ namespace WinForms_RTSP_Player.Data
 
             return defaultValue;
         }
+
+//        public bool DeleteSystemParameterByName(string name)
+//        {
+//            try
+//            {
+//                using (var connection = new SqliteConnection(_connectionString))
+//                {
+//                    connection.Open();
+//                    string query = "DELETE FROM SystemParameter WHERE Name = @Name";
+//                    using (var command = new SqliteCommand(query, connection))
+//                    {
+//                        command.Parameters.AddWithValue("@Name", name);
+//                        command.ExecuteNonQuery();
+//                    }
+//                }
+//                return true;
+//            }
+//            catch (Exception ex)
+//            {
+//#if DEBUG
+//                Console.WriteLine($"[{DateTime.Now}] Parametre silme hatası: {ex.Message}");
+//#endif
+//                return false;
+//            }
+//        }
 
 
         private void InsertSamplePlates()
@@ -984,6 +1010,73 @@ namespace WinForms_RTSP_Player.Data
                 Console.WriteLine($"[{DateTime.Now}] Eski sistem kayıtları silme hatası: {ex.Message}");
 #endif
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Gece bakım modu için: AccessLog ve SystemLog tablolarından eski kayıtları siler.
+        /// Parametre verilmezse SystemParameters.LogRetentionDays kullanılır.
+        /// </summary>
+        public void CleanupOldLogs(int? retentionDays = null)
+        {
+            try
+            {
+                int days = retentionDays ?? SystemParameters.LogRetentionDays;
+                DateTime cutoffDate = DateTime.Now.AddDays(-days);
+                
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    // AccessLog temizliği
+                    string deleteAccessLog = @"
+                        DELETE FROM AccessLog 
+                        WHERE Timestamp < @CutoffDate";
+                    
+                    using (var cmd = new SqliteCommand(deleteAccessLog, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@CutoffDate", cutoffDate.ToString("yyyy-MM-dd HH:mm:ss"));
+                        int accessDeleted = cmd.ExecuteNonQuery();
+                        
+                        LogSystem("INFO", 
+                            $"AccessLog temizlendi: {accessDeleted} kayıt silindi (>{days} gün eski)",
+                            "DatabaseManager.CleanupOldLogs");
+
+#if DEBUG
+                        Console.WriteLine($"[{DateTime.Now}] [CLEANUP] AccessLog temizlendi: {accessDeleted} kayıt silindi (>{days} gün eski)");
+#endif
+                    }
+                    
+                    // SystemLog temizliği
+                    string deleteSystemLog = @"
+                        DELETE FROM SystemLog 
+                        WHERE Timestamp < @CutoffDate";
+                    
+                    using (var cmd = new SqliteCommand(deleteSystemLog, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@CutoffDate", cutoffDate.ToString("yyyy-MM-dd HH:mm:ss"));
+                        int systemDeleted = cmd.ExecuteNonQuery();
+                        
+                        LogSystem("INFO", 
+                            $"SystemLog temizlendi: {systemDeleted} kayıt silindi (>{days} gün eski)",
+                            "DatabaseManager.CleanupOldLogs");
+
+#if DEBUG
+                        Console.WriteLine($"[{DateTime.Now}] [CLEANUP] SystemLog temizlendi: {systemDeleted} kayıt silindi (>{days} gün eski)");
+#endif
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogSystem("ERROR", 
+                    "Log temizleme hatası", 
+                    "DatabaseManager.CleanupOldLogs", 
+                    ex.ToString());
+
+#if DEBUG
+                Console.WriteLine($"[{DateTime.Now}] [ERROR] Log temizleme hatası: {ex.Message}");
+#endif
             }
         }
     }

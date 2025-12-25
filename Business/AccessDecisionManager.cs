@@ -203,16 +203,16 @@ namespace WinForms_RTSP_Player.Business
             // YETKİSİZ ARAÇ
             else
             {
-                if (IsUnauthorizedCooldownActiveIN(plate))
+                if (IsUnauthorizedCooldownActiveIN(ocrPlate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {ocrPlate}");
 #endif
                     
                     return new AccessDecision
                     {
-                        Plate = plate,
+                        Plate = ocrPlate,
                         Direction = "IN",
                         Action = AccessAction.Ignore,
                         Reason = "Yetkisiz araç - cooldown aktif",
@@ -222,20 +222,20 @@ namespace WinForms_RTSP_Player.Business
                 }
 
                 // Yetkisiz araç - log at
-                _lastUnauthorizedPlateIN = plate;
+                _lastUnauthorizedPlateIN = ocrPlate;
                 _lastUnauthorizedLogTimeIN = DateTime.Now;
-                _lastProcessedPlateIN = plate;
+                _lastProcessedPlateIN = ocrPlate;
 
                 // Global tracking güncelle
-                UpdateGlobalTracking(plate, "IN");
+                UpdateGlobalTracking(ocrPlate, "IN");
 
 #if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {plate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {ocrPlate}");
 #endif
 
                 return new AccessDecision
                 {
-                    Plate = plate,
+                    Plate = ocrPlate,
                     Direction = "IN",
                     Action = AccessAction.Deny,
                     Reason = "Yetkisiz araç - giriş reddedildi",
@@ -283,16 +283,16 @@ namespace WinForms_RTSP_Player.Business
             // YETKİSİZ ARAÇ
             else
             {
-                if (IsUnauthorizedCooldownActiveOUT(plate))
+                if (IsUnauthorizedCooldownActiveOUT(ocrPlate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {ocrPlate}");
 #endif
 
                     return new AccessDecision
                     {
-                        Plate = plate,
+                        Plate = ocrPlate,
                         Direction = "OUT",
                         Action = AccessAction.Ignore,
                         Reason = "Yetkisiz araç - cooldown aktif",
@@ -307,15 +307,15 @@ namespace WinForms_RTSP_Player.Business
                 _lastProcessedPlateOUT = plate;
 
                 // Global tracking güncelle
-                UpdateGlobalTracking(plate, "OUT");
+                UpdateGlobalTracking(ocrPlate, "OUT");
 
 #if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {plate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {ocrPlate}");
 #endif
 
                 return new AccessDecision
                 {
-                    Plate = plate,
+                    Plate = ocrPlate,
                     Direction = "OUT",
                     Action = AccessAction.Deny,
                     Reason = "Yetkisiz araç - çıkış reddedildi",

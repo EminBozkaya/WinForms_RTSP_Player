@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
 
@@ -22,11 +23,19 @@ namespace WinForms_RTSP_Player.Data
         private readonly string _connectionString;
         private readonly string _dbPath;
 
+        // Plaka Önbellek Sistemi
+        private static List<string> _activePlatesCache = null;
+        private static readonly object _cacheLock = new object();
+        private static bool _isCacheInitialized = false;
+
         public DatabaseManager()
         {
             _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PlateDatabase.db");
             _connectionString = $"Data Source={_dbPath}";
             InitializeDatabase();
+            
+            // Önbelleği ilk kez yükle
+            LoadPlatesCache();
         }
 
         private void InitializeDatabase()
@@ -382,6 +391,10 @@ namespace WinForms_RTSP_Player.Data
                         command.ExecuteNonQuery();
                     }
                 }
+                
+                // Önbelleği güncelle
+                RefreshPlatesCache();
+                
                 return true;
             }
             catch (Exception ex)
@@ -417,6 +430,10 @@ namespace WinForms_RTSP_Player.Data
                         command.ExecuteNonQuery();
                     }
                 }
+                
+                // Önbelleği güncelle
+                RefreshPlatesCache();
+                
                 return true;
             }
             catch (Exception ex)
@@ -443,6 +460,10 @@ namespace WinForms_RTSP_Player.Data
                         command.ExecuteNonQuery();
                     }
                 }
+                
+                // Önbelleği güncelle
+                RefreshPlatesCache();
+                
                 return true;
             }
             catch (Exception ex)
@@ -461,7 +482,19 @@ namespace WinForms_RTSP_Player.Data
             if (string.IsNullOrEmpty(ocrPlate))
                 return false;
 
-            var plates = GetActivePlates(); // List<string>
+            // Önbellekten plaka listesini al (thread-safe)
+            List<string> plates;
+            lock (_cacheLock)
+            {
+                // Önbellek henüz yüklenmemişse yükle
+                if (!_isCacheInitialized || _activePlatesCache == null)
+                {
+                    LoadPlatesCache();
+                }
+                
+                // Önbelleğin bir kopyasını al (lock dışında işlem yapmak için)
+                plates = new List<string>(_activePlatesCache);
+            }
 
             foreach (var dbPlate in plates)
             {
@@ -659,6 +692,75 @@ namespace WinForms_RTSP_Player.Data
                 Console.WriteLine($"[{DateTime.Now}] Plaka listesi alma hatası: {ex.Message}");
 #endif
                 return new List<string>();
+            }
+        }
+
+        /// <summary>
+        /// Önbelleği veritabanından yükler (thread-safe)
+        /// </summary>
+        private void LoadPlatesCache()
+        {
+            lock (_cacheLock)
+            {
+                try
+                {
+                    _activePlatesCache = GetActivePlates();
+                    _isCacheInitialized = true;
+
+                    LogSystem("INFO", 
+                        $"Plaka önbelleği yüklendi: {_activePlatesCache.Count} aktif plaka", 
+                        "DatabaseManager.LoadPlatesCache");
+
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [INFO] Plaka önbelleği yüklendi: {_activePlatesCache.Count} aktif plaka");
+#endif
+                }
+                catch (Exception ex)
+                {
+                    LogSystem("ERROR", 
+                        "Plaka önbelleği yükleme hatası", 
+                        "DatabaseManager.LoadPlatesCache", 
+                        ex.ToString());
+
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] Plaka önbelleği yükleme hatası: {ex.Message}");
+#endif
+                    _activePlatesCache = new List<string>();
+                    _isCacheInitialized = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Önbelleği yeniler (plaka eklendiğinde, güncellendiğinde veya silindiğinde çağrılır)
+        /// </summary>
+        public void RefreshPlatesCache()
+        {
+            lock (_cacheLock)
+            {
+                try
+                {
+                    _activePlatesCache = GetActivePlates();
+
+                    LogSystem("INFO", 
+                        $"Plaka önbelleği güncellendi: {_activePlatesCache.Count} aktif plaka", 
+                        "DatabaseManager.RefreshPlatesCache");
+
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [INFO] Plaka önbelleği güncellendi: {_activePlatesCache.Count} aktif plaka");
+#endif
+                }
+                catch (Exception ex)
+                {
+                    LogSystem("ERROR", 
+                        "Plaka önbelleği güncelleme hatası", 
+                        "DatabaseManager.RefreshPlatesCache", 
+                        ex.ToString());
+
+#if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [ERROR] Plaka önbelleği güncelleme hatası: {ex.Message}");
+#endif
+                }
             }
         }
         public DataTable GetPlates()

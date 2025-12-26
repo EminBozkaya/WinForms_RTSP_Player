@@ -202,7 +202,7 @@ namespace WinForms_RTSP_Player.Data
                 AddSystemParameter("GATE_LOCK_SECONDS", "45", "Kapı Açılma Bekleme Süresi (saniye)");
                 AddSystemParameter("CROSS_DIRECTION_COOLDOWN_SECONDS", "45", "Aynı Araç Giriş-Çıkış Bekleme Süresi (saniye)");
                 AddSystemParameter("AuthorizedConfidenceThreshold", "65", "Kayıtlı Araç Plaka Okuma Doğruluk Eşiği (%)");
-                AddSystemParameter("UnAuthorizedConfidenceThreshold", "75", "Kayıtsız Araç Plaka Okuma Doğruluk Eşiği (%)");
+                AddSystemParameter("UnAuthorizedConfidenceThreshold", "85", "Kayıtsız Araç Plaka Okuma Doğruluk Eşiği (%)");
                 AddSystemParameter("LogRetentionDays", "15", "Logların Saklanacağı Gün Sayısı (gün)");
             }
             catch (Exception ex)

@@ -31,7 +31,7 @@ namespace WinForms_RTSP_Player.Utilities
         public static int GATE_LOCK_SECONDS { get; private set; } = 45; //45 sn - Kapı Açılma Bekleme Süresi
         public static int CROSS_DIRECTION_COOLDOWN_SECONDS { get; private set; } = 45; //45 sn - Aynı Araç Giriş-Çıkış Bekleme Süresi
         public static float AuthorizedConfidenceThreshold { get; private set; } = 65f; //Kayıtlı Araç Plaka Okuma Doğruluk Eşiği (%)
-        public static float UnAuthorizedConfidenceThreshold { get; private set; } = 75f; //Kayıtsız Araç Plaka Okuma Doğruluk Eşiği (%)
+        public static float UnAuthorizedConfidenceThreshold { get; private set; } = 85f; //Kayıtsız Araç Plaka Okuma Doğruluk Eşiği (%)
 
         // Veri Temizleme Parametreleri
         public static int LogRetentionDays { get; private set; } = 15; //Logların Saklanacağı Gün Sayısı (Varsayılan: 15)

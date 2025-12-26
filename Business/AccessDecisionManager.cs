@@ -87,7 +87,7 @@ namespace WinForms_RTSP_Player.Business
                     if (IsGateLockActiveGlobal())
                     {
 #if DEBUG
-                        Console.WriteLine($"[{DateTime.Now}] [GLOBAL LOCK] Kapı zaten açık → IGNORE: {correctedPlate} ({direction})");
+                        Console.WriteLine($"[{DateTime.Now}] [GLOBAL LOCK] Kapı zaten açık → IGNORE: {correctedPlate} ({direction})  Confidence: {confidence}");
 #endif
                         return new AccessDecision
                         {
@@ -107,7 +107,7 @@ namespace WinForms_RTSP_Player.Business
 #if DEBUG
                         Console.WriteLine($"[{DateTime.Now}] ⚠️ CROSS-DIRECTION DUPLICATE: {correctedPlate} - " +
                             $"Son işlem: {_lastProcessedDirectionGlobal} ({secondsSinceLastGlobal:F1}s önce), " +
-                            $"Şimdi: {direction} - IGNORE");
+                            $"Şimdi: {direction} - IGNORE    |    Confidence: {confidence}");
 #endif
 
                         return new AccessDecision
@@ -184,7 +184,7 @@ namespace WinForms_RTSP_Player.Business
                 // 5. Canonical Log
 #if DEBUG
                 string ocrInfo = machedDbPlate != plate ? $"OCR:{plate}" : "";
-                Console.WriteLine($"[PLATE] {machedDbPlate} | IN | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
+                Console.WriteLine($"[PLATE] {machedDbPlate} | IN | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo} | Confidence: {confidence}");
 #endif
 
                 return new AccessDecision
@@ -203,11 +203,23 @@ namespace WinForms_RTSP_Player.Business
             // YETKİSİZ ARAÇ
             else
             {
+                if (confidence < SystemParameters.UnAuthorizedConfidenceThreshold)
+                {
+                    return new AccessDecision
+                    {
+                        Plate = plate,
+                        Direction = "IN",
+                        Action = AccessAction.Ignore,
+                        Reason = $"Düşük güven skoru: {confidence:F1}% < {SystemParameters.UnAuthorizedConfidenceThreshold}%",
+                        IsAuthorized = false,
+                        Confidence = confidence
+                    };
+                }
                 if (IsUnauthorizedCooldownActiveIN(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeIN).TotalSeconds;
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (IN) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate} Confidence: {confidence}");
 #endif
                     
                     return new AccessDecision
@@ -230,7 +242,7 @@ namespace WinForms_RTSP_Player.Business
                 UpdateGlobalTracking(plate, "IN");
 
 #if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {plate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (IN): {plate} Confidence: {confidence}");
 #endif
 
                 return new AccessDecision
@@ -264,7 +276,7 @@ namespace WinForms_RTSP_Player.Business
                 // 5. Canonical Log
 #if DEBUG
                 string ocrInfo = machedDbPlate != plate ? $"OCR:{plate}" : "";
-                Console.WriteLine($"[PLATE] {machedDbPlate} | OUT | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo}");
+                Console.WriteLine($"[PLATE] {machedDbPlate} | OUT | AUTH | CONF:{confidence:F1} | ACTION:ALLOW | ID:{gateOpId} | OWNER:{owner} | {ocrInfo} | Confidence: {confidence}");
 #endif
 
                 return new AccessDecision
@@ -283,11 +295,23 @@ namespace WinForms_RTSP_Player.Business
             // YETKİSİZ ARAÇ
             else
             {
+                if (confidence < SystemParameters.UnAuthorizedConfidenceThreshold)
+                {
+                    return new AccessDecision
+                    {
+                        Plate = plate,
+                        Direction = "OUT",
+                        Action = AccessAction.Ignore,
+                        Reason = $"Düşük güven skoru: {confidence:F1}% < {SystemParameters.UnAuthorizedConfidenceThreshold}%",
+                        IsAuthorized = false,
+                        Confidence = confidence
+                    };
+                }
                 if (IsUnauthorizedCooldownActiveOUT(plate))
                 {
                     double seconds = (DateTime.Now - _lastUnauthorizedLogTimeOUT).TotalSeconds;
 #if DEBUG
-                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate}");
+                    Console.WriteLine($"[{DateTime.Now}] Kayıtsız AYNI Araç (OUT) → {SystemParameters.UNAUTHORIZED_COOLDOWN_SECONDS - seconds:F0} sn cooldown devam ediyor: {plate} Confidence: {confidence}");
 #endif
 
                     return new AccessDecision
@@ -310,7 +334,7 @@ namespace WinForms_RTSP_Player.Business
                 UpdateGlobalTracking(plate, "OUT");
 
 #if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {plate}");
+                Console.WriteLine($"[{DateTime.Now}] ❌ Kayıtsız YENİ Araç LOG ATILIYOR (OUT): {plate} Confidence: {confidence}");
 #endif
 
                 return new AccessDecision

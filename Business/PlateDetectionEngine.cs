@@ -157,7 +157,9 @@ namespace WinForms_RTSP_Player.Business
             if (plates.Count > 0)
                 Console.WriteLine($"[{DateTime.Now}] [YOLO] {plates.Count} plaka tespit edildi (MaxConf: {maxFoundConf:F4})");
             else if (maxFoundConf > 0.01)
-                Console.WriteLine($"[{DateTime.Now}] [YOLO DEBUG] Plaka bulunamadı. En yüksek aday güveni: {maxFoundConf:F4}");
+            {
+                // Console.WriteLine($"[{DateTime.Now}] [YOLO DEBUG] Plaka bulunamadı. En yüksek aday güveni: {maxFoundConf:F4}");
+            }
 #endif
             return plates;
         }

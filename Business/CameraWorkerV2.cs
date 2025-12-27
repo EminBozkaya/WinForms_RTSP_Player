@@ -69,7 +69,7 @@ namespace WinForms_RTSP_Player.Business
             // Initialize components
             _streamCapture = new OpenCvStreamCapture(cameraId, rtspUrl);
             _motionDetector = new MotionDetector(cameraId, 
-                10.0,  // Lowered threshold - typical motion is 7-15%
+                SystemParameters.MotionThreshold, 
                 SystemParameters.MotionDebounceMs);
 
             // Subscribe to events
@@ -158,23 +158,32 @@ namespace WinForms_RTSP_Player.Business
                 // Only run motion detection if NOT in burst mode (optimization)
                 if (!isBurstActive)
                 {
-                    // 1. Motion detection (CPU intensive - only run when needed)
-                    hasMotion = _motionDetector.ProcessFrame(e.Frame);
-                    
-                    if (hasMotion)
-                    {
-                        // Only start/reset burst if not already active or finished
-                        if (_ocrAttempts >= MAX_OCR_ATTEMPTS || _stopBurst)
-                        {
-                            _ocrAttempts = 0;
-                            _stopBurst = false;
-                            _lastContinuousOcrTime = DateTime.MinValue; // Force immediate first OCR
-                            _burstStartedAt = DateTime.Now; // Fail-safe timer start
-                            isBurstActive = true;
+                    // USER REQUEST: Motion cooldown (e.g. 60 seconds)
+                    // This avoids redundant logs and CPU usage after a trigger or detection.
+                    double secondsSinceLastMotion = (DateTime.Now - _lastMotionTime).TotalSeconds;
 
-                            #if DEBUG
-                            Console.WriteLine($"[{DateTime.Now}] [OCR_BURST] Started for {CameraId}");
-                            #endif
+                    if (secondsSinceLastMotion >= 60)
+                    {
+                        // 1. Motion detection (CPU intensive - only run when needed)
+                        hasMotion = _motionDetector.ProcessFrame(e.Frame);
+
+                        if (hasMotion)
+                        {
+                            // Motion detected! Reset burst mode
+                            // Only start/reset burst if not already active or finished
+                            if (_ocrAttempts >= MAX_OCR_ATTEMPTS || _stopBurst)
+                            {
+                                _ocrAttempts = 0;
+                                _stopBurst = false;
+                                _lastContinuousOcrTime = DateTime.MinValue; // Force immediate first OCR
+                                _burstStartedAt = DateTime.Now; // Fail-safe timer start
+                                isBurstActive = true;
+                                _lastMotionTime = DateTime.Now; // Start cooldown
+
+                                #if DEBUG
+                                Console.WriteLine($"[{DateTime.Now}] [OCR_BURST] Started for {CameraId}");
+                                #endif
+                            }
                         }
                     }
                 }
@@ -239,7 +248,7 @@ namespace WinForms_RTSP_Player.Business
                              _ocrAttempts++;
 
                              #if DEBUG
-                             Console.WriteLine($"[{DateTime.Now}] [YOLO_FALLBACK] No ROI found for {CameraId}, sending full frame to OCR.");
+                             // Console.WriteLine($"[{DateTime.Now}] [YOLO_FALLBACK] No ROI found for {CameraId}, sending full frame to OCR.");
                              #endif
                         }
                         

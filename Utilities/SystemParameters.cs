@@ -37,7 +37,7 @@ namespace WinForms_RTSP_Player.Utilities
         public static int LogRetentionDays { get; private set; } = 15; //Logların Saklanacağı Gün Sayısı (Varsayılan: 15)
 
         // Motion Detection Parametreleri
-        public static double MotionThreshold { get; private set; } = 10.0; // Hareket Tespit Eşiği (%)
+        public static double MotionThreshold { get; private set; } = 3.0; // Hareket Tespit Eşiği (%)
         public static int MotionDebounceMs { get; private set; } = 2000; // Hareket Debounce Süresi (ms)
 
         // ONNX Model Parametreleri

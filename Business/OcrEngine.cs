@@ -176,7 +176,7 @@ namespace WinForms_RTSP_Player.Business
 
                     // Debug: Log dimensions once in console
                     var dims = output.Dimensions.ToArray();
-                    Console.WriteLine($"[OCR DEBUG] Output Dims: {string.Join("x", dims)} | Chars in Dict: {_characters.Count}");
+                    // Console.WriteLine($"[OCR DEBUG] Output Dims: {string.Join("x", dims)} | Chars in Dict: {_characters.Count}");
 
                     // Postprocess results
                     return PostprocessResults(output);

@@ -24,6 +24,12 @@ namespace WinForms_RTSP_Player.Utilities
 
             plate = plate.ToUpperInvariant().Trim();
 
+            // Plaka başındaki "TR" veya "R" (mavi şeritten gelen hatalı okuma) kısımlarını temizle
+            if (plate.StartsWith("TR"))
+                plate = plate.Substring(2);
+            else if (plate.StartsWith("R") && plate.Length > 2 && char.IsDigit(plate[1]))
+                plate = plate.Substring(1);
+
             plate = RemoveInvalidCharacters(plate);
             plate = FixFirstTwoCharacters(plate);
             plate = FixThirdCharacterIfPossible(plate);

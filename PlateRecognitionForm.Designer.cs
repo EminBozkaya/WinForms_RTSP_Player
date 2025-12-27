@@ -3,8 +3,8 @@ namespace WinForms_RTSP_Player
     partial class PlateRecognitionForm
     {
         private System.ComponentModel.IContainer components = null;
-        private LibVLCSharp.WinForms.VideoView videoViewIN;
-        private LibVLCSharp.WinForms.VideoView videoViewOUT;
+        private System.Windows.Forms.PictureBox pictureBoxIN;
+        private System.Windows.Forms.PictureBox pictureBoxOUT;
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.Button btnTest;
         private System.Windows.Forms.Panel panelTop;
@@ -31,8 +31,8 @@ namespace WinForms_RTSP_Player
 
         private void InitializeComponent()
         {
-            videoViewIN = new LibVLCSharp.WinForms.VideoView();
-            videoViewOUT = new LibVLCSharp.WinForms.VideoView();
+            pictureBoxIN = new PictureBox();
+            pictureBoxOUT = new PictureBox();
             btnStart = new Button();
             btnTest = new Button();
             panelTop = new Panel();
@@ -50,8 +50,8 @@ namespace WinForms_RTSP_Player
             lblResultOUT = new Label();
             btnBack = new Button();
             panelBottom = new Panel();
-            ((System.ComponentModel.ISupportInitialize)videoViewIN).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)videoViewOUT).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxIN).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxOUT).BeginInit();
             panelTop.SuspendLayout();
             tableLayoutCameras.SuspendLayout();
             panelIN.SuspendLayout();
@@ -61,25 +61,27 @@ namespace WinForms_RTSP_Player
             panelBottom.SuspendLayout();
             SuspendLayout();
             // 
-            // videoViewIN
+            // pictureBoxIN
             // 
-            videoViewIN.BackColor = Color.Black;
-            videoViewIN.Dock = DockStyle.Fill;
-            videoViewIN.Location = new Point(0, 0);
-            videoViewIN.MediaPlayer = null;
-            videoViewIN.Name = "videoViewIN";
-            videoViewIN.Size = new Size(566, 635);
-            videoViewIN.TabIndex = 0;
+            pictureBoxIN.BackColor = Color.Black;
+            pictureBoxIN.Dock = DockStyle.Fill;
+            pictureBoxIN.Location = new Point(0, 0);
+            pictureBoxIN.Name = "pictureBoxIN";
+            pictureBoxIN.Size = new Size(566, 635);
+            pictureBoxIN.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxIN.TabIndex = 0;
+            pictureBoxIN.TabStop = false;
             // 
-            // videoViewOUT
+            // pictureBoxOUT
             // 
-            videoViewOUT.BackColor = Color.Black;
-            videoViewOUT.Dock = DockStyle.Fill;
-            videoViewOUT.Location = new Point(0, 0);
-            videoViewOUT.MediaPlayer = null;
-            videoViewOUT.Name = "videoViewOUT";
-            videoViewOUT.Size = new Size(566, 635);
-            videoViewOUT.TabIndex = 0;
+            pictureBoxOUT.BackColor = Color.Black;
+            pictureBoxOUT.Dock = DockStyle.Fill;
+            pictureBoxOUT.Location = new Point(0, 0);
+            pictureBoxOUT.Name = "pictureBoxOUT";
+            pictureBoxOUT.Size = new Size(566, 635);
+            pictureBoxOUT.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxOUT.TabIndex = 0;
+            pictureBoxOUT.TabStop = false;
             // 
             // btnStart
             // 
@@ -154,7 +156,7 @@ namespace WinForms_RTSP_Player
             panelIN.BorderStyle = BorderStyle.FixedSingle;
             panelIN.Controls.Add(lblCamTitleIN);
             panelIN.Controls.Add(panelResultsIN);
-            panelIN.Controls.Add(videoViewIN);
+            panelIN.Controls.Add(pictureBoxIN);
             panelIN.Dock = DockStyle.Fill;
             panelIN.Location = new Point(3, 3);
             panelIN.Name = "panelIN";
@@ -212,7 +214,7 @@ namespace WinForms_RTSP_Player
             panelOUT.BorderStyle = BorderStyle.FixedSingle;
             panelOUT.Controls.Add(lblCamTitleOUT);
             panelOUT.Controls.Add(panelResultsOUT);
-            panelOUT.Controls.Add(videoViewOUT);
+            panelOUT.Controls.Add(pictureBoxOUT);
             panelOUT.Dock = DockStyle.Fill;
             panelOUT.Location = new Point(577, 3);
             panelOUT.Name = "panelOUT";
@@ -306,8 +308,8 @@ namespace WinForms_RTSP_Player
             Name = "PlateRecognitionForm";
             Text = "PES Plaka Tanıma Sistemi - ÇOKLU KAMERA";
             FormClosing += MainForm_FormClosing;
-            ((System.ComponentModel.ISupportInitialize)videoViewIN).EndInit();
-            ((System.ComponentModel.ISupportInitialize)videoViewOUT).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxIN).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBoxOUT).EndInit();
             panelTop.ResumeLayout(false);
             tableLayoutCameras.ResumeLayout(false);
             panelIN.ResumeLayout(false);

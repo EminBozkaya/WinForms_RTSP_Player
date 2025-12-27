@@ -36,6 +36,23 @@ namespace WinForms_RTSP_Player.Utilities
         // Veri Temizleme Parametreleri
         public static int LogRetentionDays { get; private set; } = 15; //Logların Saklanacağı Gün Sayısı (Varsayılan: 15)
 
+        // Motion Detection Parametreleri
+        public static double MotionThreshold { get; private set; } = 10.0; // Hareket Tespit Eşiği (%)
+        public static int MotionDebounceMs { get; private set; } = 2000; // Hareket Debounce Süresi (ms)
+
+        // ONNX Model Parametreleri
+        public static float PlateDetectionConfidence { get; private set; } = 0.10f; // Plaka Tespit Doğruluk Eşiği (test: 0.10)
+        public static float OcrConfidence { get; private set; } = 0.5f; // OCR Doğruluk Eşiği
+
+
+        // Model Dosya Yolları
+        public static string PlateDetectionModelPath => 
+            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "yolov8n-plate-detection.onnx");
+        public static string OcrModelPath => 
+            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "paddle-ocr-rec.onnx");
+        public static string OcrDictPath => 
+            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "paddle-dict-latin.txt");
+
         /// <summary>
         /// Parametreleri veritabanından bir kez yükler. Hatalı okumalarda varsayılan değerler korunur.
         /// </summary>
@@ -70,6 +87,14 @@ namespace WinForms_RTSP_Player.Utilities
 
                 // LogRetentionDays artık otomatik OLUŞTURULMAZ. Eğer DB'de yoksa default (15) döner ama DB'ye yazmaz.
                 LogRetentionDays = GetInt(db, "LogRetentionDays", 15);
+
+                // Motion Detection Parametreleri
+                MotionThreshold = GetDouble(db, "MotionThreshold", MotionThreshold);
+                MotionDebounceMs = GetInt(db, "MotionDebounceMs", MotionDebounceMs);
+
+                // ONNX Model Parametreleri
+                PlateDetectionConfidence = GetFloat(db, "PlateDetectionConfidence", PlateDetectionConfidence);
+                OcrConfidence = GetFloat(db, "OcrConfidence", OcrConfidence);
             }
             catch (Exception ex)
             {

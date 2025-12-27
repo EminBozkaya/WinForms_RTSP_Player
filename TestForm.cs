@@ -5,6 +5,8 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using OpenCvSharp;
+using WinForms_RTSP_Player.Business;
 using WinForms_RTSP_Player.Utilities;
 using static WinForms_RTSP_Player.Utilities.PlateRecognitionHelper;
 
@@ -15,6 +17,7 @@ namespace WinForms_RTSP_Player
         private List<string> imageFiles;
         private int currentIndex = -1;
         private string selectedFolder = "";
+        private PictureBox pictureBoxPlate;
 
         public TestForm()
         {
@@ -37,14 +40,31 @@ namespace WinForms_RTSP_Player
             // Kapı Test Butonu
             Button btnTestGate = new Button();
             btnTestGate.Text = "🚪 Kapıyı Test Et";
-            btnTestGate.Size = new Size(150, 40);
-            btnTestGate.Location = new Point(this.Width - 180, this.Height - 100);
+            btnTestGate.Size = new System.Drawing.Size(150, 40);
+            btnTestGate.Location = new System.Drawing.Point(this.Width - 180, this.Height - 100);
             btnTestGate.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             btnTestGate.Click += (s, e) => {
                 _ = HardwareController.Instance.OpenGateAsync();
                 MessageBox.Show("Kapı açma komutu gönderildi.");
             };
             this.Controls.Add(btnTestGate);
+
+            // Plate Crop Visualization
+            pictureBoxPlate = new PictureBox();
+            pictureBoxPlate.Size = new System.Drawing.Size(320, 60);
+            pictureBoxPlate.Location = new System.Drawing.Point(this.Width - 350, 20);
+            pictureBoxPlate.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            pictureBoxPlate.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxPlate.BorderStyle = BorderStyle.FixedSingle;
+            pictureBoxPlate.BackColor = Color.Black;
+            this.Controls.Add(pictureBoxPlate);
+            
+            Label lblCrop = new Label();
+            lblCrop.Text = "Ocr Giriş (Kesilen Plaka):";
+            lblCrop.ForeColor = Color.White;
+            lblCrop.Location = new System.Drawing.Point(this.Width - 350, 5);
+            lblCrop.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            this.Controls.Add(lblCrop);
         }
 
         private void btnSelectFolder_Click(object sender, EventArgs e)
@@ -135,38 +155,84 @@ namespace WinForms_RTSP_Player
 
         private string RecognizePlateFromImage(string imagePath)
         {
+            // Mat objects must be disposed
+            Mat frame = null;
+            Mat cropped = null;
+
             try
             {
                 lblPlate.Text = "Tespit Edilen Plaka: İşleniyor...";
                 lblPlate.ForeColor = Color.Yellow;
 
-                // OpenALPR ile analiz et
-                string result = PlateRecognitionHelper.RunOpenALPR(imagePath);
-                PlateResult plateResult = PlateRecognitionHelper.ExtractPlateFromJson(result);
-                
-                if (plateResult != null && !string.IsNullOrEmpty(plateResult.Plate) && plateResult.Plate != "Plaka geçersiz veya okunamadı.")
+                // 1. Load image with OpenCV
+                frame = Cv2.ImRead(imagePath);
+                if (frame.Empty())
+                {
+                    lblPlate.Text = "Hata: Resim okunamadı";
+                    return "Hata";
+                }
+
+                // 2. Detect Plate ROI (YOLO)
+                var roi = PlateDetectionEngine.Instance.DetectPrimaryRoi(frame);
+
+                string resultText = "";
+                float confidence = 0f;
+
+                if (roi.Width > 0 && roi.Height > 0)
+                {
+                    // 3. Crop ROI
+                    cropped = new Mat(frame, roi);
+
+                    // SHOW CROP IN UI
+                    var oldImage = pictureBoxPlate.Image;
+                    pictureBoxPlate.Image = cropped.ToBitmap();
+                    oldImage?.Dispose();
+
+                    // 4. Recognize Text (PaddleOCR)
+                    var ocrResult = OcrEngine.Instance.RecognizeText(cropped);
+                    
+                    resultText = ocrResult.Text;
+                    confidence = ocrResult.Confidence;
+                }
+                else
+                {
+                    // ROI not found - FALLBACK: Try whole frame (case for very zoomed in images)
+                    lblPlate.Text = "Tespit: Başarısız. Fallback (Tüm Resim) deneniyor...";
+                    
+                    var ocrResult = OcrEngine.Instance.RecognizeText(frame);
+                    resultText = ocrResult.Text;
+                    confidence = ocrResult.Confidence;
+                    
+                    // Show frame as "crop" in UI to indicate fallback
+                    var oldImage = pictureBoxPlate.Image;
+                    pictureBoxPlate.Image = frame.ToBitmap();
+                    oldImage?.Dispose();
+                }        
+
+                // 5. Validate and Clean Result
+                if (!string.IsNullOrEmpty(resultText))
                 {
                     // Plakayı düzelt (Türk formatına uygun hale getir)
-                    string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(plateResult.Plate);
+                    string correctedPlate = PlateSanitizer.ValidateTurkishPlateFormat(resultText);
                     
                     if (!string.IsNullOrEmpty(correctedPlate))
                     {
-                        lblPlate.Text = $"Tespit Edilen Plaka: {correctedPlate}";
+                        lblPlate.Text = $"Tespit Edilen Plaka: {correctedPlate} (Conf: %{confidence * 100:F1})";
                         lblPlate.ForeColor = Color.FromArgb(0, 200, 83);
                         return correctedPlate;
                     }
                     else
                     {
-                        lblPlate.Text = "Tespit Edilen Plaka: Geçersiz format";
+                        lblPlate.Text = $"Plaka Formatı Geçersiz: {resultText} (Conf: %{confidence * 100:F1})";
                         lblPlate.ForeColor = Color.FromArgb(244, 67, 54);
                         return "Geçersiz format";
                     }
                 }
                 else
                 {
-                    lblPlate.Text = "Tespit Edilen Plaka: Bulunamadı";
+                    lblPlate.Text = "Tespit Edilen Plaka: Okunamadı";
                     lblPlate.ForeColor = Color.FromArgb(244, 67, 54);
-                    return "Bulunamadı";
+                    return "Okunamadı";
                 }
             }
             catch (Exception ex)
@@ -175,6 +241,12 @@ namespace WinForms_RTSP_Player
                 lblPlate.ForeColor = Color.FromArgb(244, 67, 54);
                 WinForms_RTSP_Player.Data.DatabaseManager.Instance.LogSystem("ERROR", "Test OCR hatası", "TestForm.RecognizePlateFromImage", ex.ToString());
                 return "Hata";
+            }
+            finally
+            {
+                // Dispose OpenCV resources
+                frame?.Dispose();
+                cropped?.Dispose();
             }
         }
 
@@ -185,6 +257,11 @@ namespace WinForms_RTSP_Player
             {
                 pictureBox1.Image.Dispose();
                 pictureBox1.Image = null;
+            }
+            if (pictureBoxPlate.Image != null)
+            {
+                pictureBoxPlate.Image.Dispose();
+                pictureBoxPlate.Image = null;
             }
         }
     }

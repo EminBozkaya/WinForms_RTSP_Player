@@ -1,4 +1,3 @@
-using LibVLCSharp.Shared;
 using System;
 using System.Configuration;
 using System.Drawing;
@@ -11,9 +10,9 @@ namespace WinForms_RTSP_Player
 {
     public partial class PlateRecognitionForm : Form
     {
-        // Camera workers
-        private CameraWorker _cameraWorkerIN;
-        private CameraWorker _cameraWorkerOUT;
+        // Camera workers (OpenCV-based)
+        private CameraWorkerV2 _cameraWorkerIN;
+        private CameraWorkerV2 _cameraWorkerOUT;
 
         // UI management
         private System.Windows.Forms.Timer _uiResetTimerIN;
@@ -38,19 +37,20 @@ namespace WinForms_RTSP_Player
                 _uiResetTimerOUT.Tick += (s, e) => ResetUI("OUT");
 
                 InitializeComponent();
-                Core.Initialize(@"libvlc\win-x64");
+                // LibVLC removed - using OpenCV now
 
                 // Veri tabanı yöneticisini başlat
                 _databaseManager = DatabaseManager.Instance;
 
-                // IN kamerasını başlat (videoViewIN eklendi)
+                // IN kamerasını başlat (OpenCV-based)
                 string rtspUrlIN = ConfigurationManager.AppSettings["RtspUrl_IN"];
                 if (!string.IsNullOrEmpty(rtspUrlIN))
                 {
-                    _cameraWorkerIN = new CameraWorker("CAM_IN", rtspUrlIN, "IN", videoViewIN);
+                    _cameraWorkerIN = new CameraWorkerV2("CAM_IN", rtspUrlIN, "IN", pictureBoxIN);
                     _cameraWorkerIN.PlateDetected += OnPlateDetected;
+                    _cameraWorkerIN.FrameReceived += (s, e) => UpdateFpsLabel("IN", _cameraWorkerIN);
                     DatabaseManager.Instance.LogSystem("INFO", 
-                        "IN kamerası yapılandırıldı", 
+                        "IN kamerası yapılandırıldı (OpenCV)", 
                         "PlateRecognitionForm.Constructor");
                 }
                 else
@@ -62,14 +62,15 @@ namespace WinForms_RTSP_Player
                     return;
                 }
 
-                // OUT kamerasını başlat (videoViewOUT eklendi)
+                // OUT kamerasını başlat (OpenCV-based)
                 string rtspUrlOUT = ConfigurationManager.AppSettings["RtspUrl_OUT"];
                 if (!string.IsNullOrEmpty(rtspUrlOUT))
                 {
-                    _cameraWorkerOUT = new CameraWorker("CAM_OUT", rtspUrlOUT, "OUT", videoViewOUT);
+                    _cameraWorkerOUT = new CameraWorkerV2("CAM_OUT", rtspUrlOUT, "OUT", pictureBoxOUT);
                     _cameraWorkerOUT.PlateDetected += OnPlateDetected;
+                    _cameraWorkerOUT.FrameReceived += (s, e) => UpdateFpsLabel("OUT", _cameraWorkerOUT);
                     DatabaseManager.Instance.LogSystem("INFO", 
-                        "OUT kamerası yapılandırıldı", 
+                        "OUT kamerası yapılandırıldı (OpenCV)", 
                         "PlateRecognitionForm.Constructor");
                 }
                 else
@@ -90,6 +91,9 @@ namespace WinForms_RTSP_Player
                 {
                     HardwareController.Instance.Initialize(arduinoPort, baudRate);
                 }
+
+                // ONNX modellerini ön-yükle (ilk OCR'ı bekleme)
+                PreloadOnnxModels();
 
                 // Gece bakım modunu başlat
                 InitializeMaintenanceMode();
@@ -230,6 +234,45 @@ namespace WinForms_RTSP_Player
             }
         }
 
+        private void UpdateFpsLabel(string direction, CameraWorkerV2 worker)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => UpdateFpsLabel(direction, worker)));
+                return;
+            }
+
+            try
+            {
+                // FPS label'ı güncelle (eğer varsa)
+                // Not: Designer'da lblFpsIN ve lblFpsOUT eklenmişse kullanılır
+                string fpsText = $"FPS: {worker.CurrentFps:F1} | State: {worker.State}";
+                
+                if (direction == "IN")
+                {
+                    // lblFpsIN varsa güncelle
+                    var lblFps = Controls.Find("lblFpsIN", true);
+                    if (lblFps.Length > 0 && lblFps[0] is Label label)
+                    {
+                        label.Text = fpsText;
+                    }
+                }
+                else
+                {
+                    // lblFpsOUT varsa güncelle
+                    var lblFps = Controls.Find("lblFpsOUT", true);
+                    if (lblFps.Length > 0 && lblFps[0] is Label label)
+                    {
+                        label.Text = fpsText;
+                    }
+                }
+            }
+            catch
+            {
+                // FPS label yoksa sessizce devam et
+            }
+        }
+
 
 
 
@@ -298,6 +341,30 @@ namespace WinForms_RTSP_Player
             {
                 DatabaseManager.Instance.LogSystem("ERROR", "Geri dönme hatası", "PlateRecognitionForm.btnBack_Click", ex.ToString());
             }
+        }
+
+        /// <summary>
+        /// ONNX modellerini arka planda yükler
+        /// </summary>
+        private void PreloadOnnxModels()
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    DatabaseManager.Instance.LogSystem("INFO", "ONNX model ön-yükleme başlatılıyor...", "PlateRecognitionForm.PreloadOnnxModels");
+                    
+                    // Accessing Instance property triggers initialization and model loading
+                    var detectionEngine = WinForms_RTSP_Player.Business.PlateDetectionEngine.Instance;
+                    var ocrEngine = WinForms_RTSP_Player.Business.OcrEngine.Instance;
+
+                    DatabaseManager.Instance.LogSystem("INFO", "ONNX model ön-yükleme tamamlandı.", "PlateRecognitionForm.PreloadOnnxModels");
+                }
+                catch (Exception ex)
+                {
+                    DatabaseManager.Instance.LogSystem("ERROR", "ONNX model ön-yükleme hatası", "PlateRecognitionForm.PreloadOnnxModels", ex.ToString());
+                }
+            });
         }
 
         /// <summary>
@@ -370,26 +437,9 @@ namespace WinForms_RTSP_Player
 
                 System.Threading.Thread.Sleep(2000);
 
-                // 2. Şimdi GC güvenli (Kameralar kapalı, OCR işlemi yok)
-                DatabaseManager.Instance.LogSystem("INFO", 
-                    "Bellek temizliği başlatılıyor (GC)", 
-                    "PlateRecognitionForm.MaintenanceMode");
-
-#if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] [MAINTENANCE] GC başlatılıyor...");
-#endif
-
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-
-                DatabaseManager.Instance.LogSystem("INFO", 
-                    "Bellek temizliği tamamlandı", 
-                    "PlateRecognitionForm.MaintenanceMode");
-
-#if DEBUG
-                Console.WriteLine($"[{DateTime.Now}] [MAINTENANCE] GC tamamlandı");
-#endif
+                // 2. GC removed based on best practices
+                // Memory management handles itself since we fixed the logical leaks
+                // DatabaseManager.Instance.LogSystem("INFO", "Bellek temizliği (GC) atlandı", "PlateRecognitionForm.MaintenanceMode");
 
                 System.Threading.Thread.Sleep(2000);
 

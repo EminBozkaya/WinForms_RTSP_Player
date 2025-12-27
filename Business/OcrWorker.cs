@@ -1,6 +1,6 @@
+using OpenCvSharp;
 using System;
 using System.Collections.Concurrent;
-using System.IO;
 using System.Threading;
 using WinForms_RTSP_Player.Data;
 using WinForms_RTSP_Player.Utilities;
@@ -14,13 +14,13 @@ namespace WinForms_RTSP_Player.Business
     {
         public string CameraId { get; set; }
         public string Direction { get; set; }
-        public byte[] ImageBytes { get; set; }
+        public Mat Frame { get; set; } // Changed from byte[] to Mat
         public DateTime CapturedAt { get; set; }
     }
 
     /// <summary>
     /// Singleton OCR Worker - Sıralı işleme (Sequential Processing) yapar.
-    /// Disk I/O ve OpenALPR yükünü tek bir arka plan thread'inde yönetir.
+    /// ONNX-based plate detection ve OCR pipeline'ı tek bir arka plan thread'inde yönetir.
     /// </summary>
     public class OcrWorker : IDisposable
     {
@@ -111,70 +111,102 @@ namespace WinForms_RTSP_Player.Business
 
         private void ProcessJob(OcrJob job)
         {
-            string tempPath = null;
             try
             {
-                // Unique temp dosya adı (Lock olmadan)
-                tempPath = Path.Combine(Path.GetTempPath(), $"ocr_{Guid.NewGuid()}.jpg");
-                
-                // Resmi diske yaz
-                File.WriteAllBytes(tempPath, job.ImageBytes);
+                if (job.Frame == null || job.Frame.Empty())
+                {
+                    DatabaseManager.Instance.LogSystem("WARNING",
+                        $"Boş frame alındı: {job.CameraId}",
+                        "OcrWorker.ProcessJob");
+                    return;
+                }
+
+                // STALE FRAME PROTECTION
+                // Field condition: If frame is older than 2 seconds, it is irrelevant.
+                // This protects against network jitter or CPU spikes accumulating old frames.
+                if ((DateTime.Now - job.CapturedAt).TotalSeconds > 2)
+                {
+                    DatabaseManager.Instance.LogSystem("WARNING",
+                        $"Eski frame atlandı ({(DateTime.Now - job.CapturedAt).TotalSeconds:F1}s): {job.CameraId}",
+                        "OcrWorker.ProcessJob");
+                    
+                    job.Frame.Dispose();
+                    return;
+                }
 
                 // LATENCY METRIC
                 double latencyMs = (DateTime.Now - job.CapturedAt).TotalMilliseconds;
 #if DEBUG
-                // Sadece CİDDİ gecikme varsa (1000ms üzeri) logla
-                // Normal işlem süresi 200-500ms arası olabilir
                 if (latencyMs > 1000)
                 {
                     Console.WriteLine($"[OCR_LATENCY] {latencyMs:F0} ms - {job.CameraId}");
                 }
 #endif
 
-                // OpenALPR çalıştır
-                string jsonResult = PlateRecognitionHelper.RunOpenALPR(tempPath);
-                
-                // Sonucu parse et
-                var plateResult = PlateRecognitionHelper.ExtractPlateFromJson(jsonResult);
+                // DIRECT OCR (Input is already cropped ROI)
+                // Run OCR
+                var ocrResult = OcrEngine.Instance.RecognizeText(job.Frame);
 
-                // Dosyayı hemen sil
-                if (File.Exists(tempPath))
-                    File.Delete(tempPath);
-                tempPath = null;
+                bool accepted = false;
+                string rejectionReason = "";
 
-                if (plateResult != null && 
-                    !string.IsNullOrEmpty(plateResult.Plate) &&
-                    plateResult.Plate.Length >= SystemParameters.PlateMinimumLength)
+                if (ocrResult != null && !string.IsNullOrEmpty(ocrResult.Text))
                 {
-                    // Event fırlat
-                    PlateDetected?.Invoke(this, new PlateDetectedEventArgs
+                    if (ocrResult.Text.Length < SystemParameters.PlateMinimumLength)
+                        rejectionReason = "Kısa";
+                    else if (ocrResult.Confidence < SystemParameters.OcrConfidence)
+                        rejectionReason = $"Düşük Güven (Conf: {ocrResult.Confidence:F2})";
+                    else
+                        accepted = true;
+
+                    #if DEBUG
+                    if (!accepted)
+                        Console.WriteLine($"[{DateTime.Now}] [OCR_REJECT] {ocrResult.Text} ({rejectionReason}) - {job.CameraId}");
+                    #endif
+
+                    if (accepted)
                     {
-                        CameraId = job.CameraId,
-                        Direction = job.Direction,
-                        Plate = plateResult.Plate,
-                        Confidence = plateResult.Confidence,
-                        DetectedAt = DateTime.Now,  // OCR işleme zamanı
-                        CapturedAt = job.CapturedAt // Frame yakalama zamanı (restart filtering için)
-                    });
+                        // Sanitize plate text (Türkçe karakterler)
+                        string sanitizedPlate = PlateSanitizer.ValidateTurkishPlateFormat(ocrResult.Text);
+
+                        if (!string.IsNullOrEmpty(sanitizedPlate))
+                        {
+                            // Event fırlat
+                            PlateDetected?.Invoke(this, new PlateDetectedEventArgs
+                            {
+                                CameraId = job.CameraId,
+                                Direction = job.Direction,
+                                Plate = sanitizedPlate,
+                                Confidence = ocrResult.Confidence * 100f, // Convert to percentage
+                                DetectedAt = DateTime.Now,
+                                CapturedAt = job.CapturedAt
+                            });
+
+                            #if DEBUG
+                            Console.WriteLine($"[{DateTime.Now}] [OCR_SUCCESS] {sanitizedPlate} ({ocrResult.Confidence:F2}) - {job.CameraId}");
+                            #endif
+                        }
+                    }
                 }
+                else
+                {
+                    #if DEBUG
+                    Console.WriteLine($"[{DateTime.Now}] [OCR_EMPTY] Metin okunamadı - {job.CameraId}");
+                    #endif
+                }
+
+                // Clean up frame
+                job.Frame?.Dispose();
             }
             catch (Exception ex)
             {
-                DatabaseManager.Instance.LogSystem("ERROR", 
-                    $"OCR İşleme Hatası: {job.CameraId}", 
-                    "OcrWorker.ProcessJob", 
+                DatabaseManager.Instance.LogSystem("ERROR",
+                    $"OCR İşleme Hatası: {job.CameraId}",
+                    "OcrWorker.ProcessJob",
                     ex.ToString());
 #if DEBUG
                 Console.WriteLine($"[{DateTime.Now}] [ERROR] OCR İşleme Hatası: {job.CameraId} - OcrWorker.ProcessJob - {ex.Message}");
 #endif
-            }
-            finally
-            {
-                // Her ihtimale karşı temizlik
-                if (tempPath != null && File.Exists(tempPath))
-                {
-                    try { File.Delete(tempPath); } catch { }
-                }
             }
         }
 
